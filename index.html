@@ -4,72 +4,158 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Japan Memory Lane</title>
-
-  <meta name="description" content="Quiet moments in Japan." />
-
-  <style>
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      background: #f6f7f9;
-      color: #111;
-      font-family:
-        -apple-system,
-        BlinkMacSystemFont,
-        "Helvetica Neue",
-        sans-serif;
-
-      display: flex;
-      align-items: center;
-      justify-content: center;
-
-      min-height: 100vh;
-      padding: 40px;
-    }
-
-    .wrap {
-      max-width: 520px;
-      width: 100%;
-    }
-
-    h1 {
-      font-size: 40px;
-      font-weight: 600;
-      letter-spacing: -0.03em;
-      margin: 0 0 32px;
-    }
-
-    p {
-      margin: 0;
-      line-height: 1.9;
-      font-size: 16px;
-      color: #444;
-    }
-
-    .coming {
-      margin-top: 48px;
-      color: #888;
-      font-size: 14px;
-    }
-  </style>
+  <meta
+    name="description"
+    content="Quiet Japanese memories, written as vertical poems."
+  />
+  <meta property="og:title" content="Japan Memory Lane" />
+  <meta
+    property="og:description"
+    content="Quiet moments in Japan, remembered as short poems."
+  />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Japan Memory Lane" />
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Shippori+Mincho:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="./style.css" />
 </head>
-
 <body>
-  <div class="wrap">
-    <h1>Japan Memory Lane</h1>
+  <main class="lane" aria-label="Japan Memory Lane quiet moments">
+    <section class="tanzaku is-first" data-index="1" aria-label="Rain window">
+      <header class="site-head">
+        <p class="site-name">Japan Memory Lane</p>
+        <p class="site-concept">Quiet moments in Japan.</p>
+      </header>
 
-    <p>
-      Quiet moments in Japan.<br />
-      Small streets, old shrines,<br />
-      rainy evenings, local memories.
-    </p>
+      <div class="memory">
+        <figure class="memory-photo">
+          <img
+            src="./assets/quiet-window-rain.jpg"
+            alt="A quiet rainy window in Japan"
+          />
+        </figure>
 
-    <p class="coming">
-      Coming someday.
-    </p>
-  </div>
+        <p class="jp-poem" lang="ja">
+          窓に<br />
+          雨の跡が<br />
+          残っていた
+        </p>
+
+        <p class="en-poem">
+          The rain had stopped,<br />
+          but the window still remembered.
+        </p>
+      </div>
+
+      <footer class="site-foot">
+        <button class="upload-link" type="button">
+          Upload a quiet moment in Japan.
+        </button>
+      </footer>
+    </section>
+
+    <section class="tanzaku" data-index="2" aria-label="Distant train">
+      <div class="memory">
+        <figure class="memory-photo">
+          <img
+            src="./assets/distant-train.jpg"
+            alt="A distant local train beyond a quiet wet street"
+            loading="lazy"
+          />
+        </figure>
+
+        <p class="jp-poem" lang="ja">
+          電車の音だけが<br />
+          少し<br />
+          遠かった
+        </p>
+
+        <p class="en-poem">
+          Only the sound of the train<br />
+          felt a little far away.
+        </p>
+      </div>
+    </section>
+
+    <section class="tanzaku" data-index="3" aria-label="Small shrine">
+      <div class="memory">
+        <figure class="memory-photo">
+          <img
+            src="./assets/small-shrine.jpg"
+            alt="A small empty neighborhood shrine"
+            loading="lazy"
+          />
+        </figure>
+
+        <p class="jp-poem" lang="ja">
+          誰もいないのに<br />
+          ちゃんと<br />
+          静かだった
+        </p>
+
+        <p class="en-poem">
+          No one was there,<br />
+          yet the silence felt complete.
+        </p>
+      </div>
+    </section>
+
+    <section class="tanzaku" data-index="4" aria-label="Night alley">
+      <div class="memory">
+        <figure class="memory-photo">
+          <img
+            src="./assets/night-alley.jpg"
+            alt="A quiet night alley with a small distant light"
+            loading="lazy"
+          />
+        </figure>
+
+        <p class="jp-poem" lang="ja">
+          夜道の奥で<br />
+          小さな灯りが<br />
+          待っていた
+        </p>
+
+        <p class="en-poem">
+          A small light waited<br />
+          at the end of the night street.
+        </p>
+      </div>
+    </section>
+
+    <section class="tanzaku" data-index="5" aria-label="Vending machine light">
+      <div class="memory">
+        <figure class="memory-photo">
+          <img
+            src="./assets/vending-machine-light.jpg"
+            alt="A glowing vending machine on a quiet rainy night"
+            loading="lazy"
+          />
+        </figure>
+
+        <p class="jp-poem" lang="ja">
+          自販機だけが<br />
+          夜を<br />
+          覚えていた
+        </p>
+
+        <p class="en-poem">
+          Only the vending machine<br />
+          seemed to remember the night.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <p class="position-indicator" aria-live="polite" aria-label="Current memory">
+    <span id="currentMemory">1</span> / 5
+  </p>
+
+  <script src="./main.js"></script>
 </body>
 </html>

@@ -1,0 +1,288 @@
+:root {
+  --paper: #f6f4ef;
+  --ink: #1f1f1f;
+  --muted: rgba(31, 31, 31, 0.48);
+  --quiet: rgba(31, 31, 31, 0.42);
+  --faint: rgba(31, 31, 31, 0.13);
+  --screen-height: 100svh;
+  --lane-height: var(--screen-height);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  background: var(--paper);
+}
+
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: Inter, Manrope, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  opacity: 0;
+  animation: pageFade 700ms ease forwards;
+}
+
+button,
+img {
+  display: block;
+}
+
+button {
+  font: inherit;
+}
+
+.lane {
+  width: min(100%, 430px);
+  height: var(--lane-height);
+  margin: 0 auto;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-behavior: smooth;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.lane::-webkit-scrollbar {
+  display: none;
+}
+
+.tanzaku {
+  min-height: var(--lane-height);
+  padding: 28px 26px 24px;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+.tanzaku.is-first {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.site-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  padding-top: 2px;
+}
+
+.site-name,
+.site-concept,
+.jp-poem,
+.en-poem,
+.position-indicator,
+.upload-link {
+  margin: 0;
+}
+
+.site-name {
+  color: rgba(31, 31, 31, 0.86);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.site-concept {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.memory {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-rows: minmax(0, 1fr) auto;
+  column-gap: 16px;
+  padding-top: 46px;
+}
+
+.tanzaku:not(.is-first) .memory {
+  padding-top: 74px;
+  padding-bottom: 74px;
+}
+
+.memory-photo {
+  align-self: start;
+  width: min(100%, 226px);
+  margin: 0;
+}
+
+.memory-photo img {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border: 1px solid rgba(31, 31, 31, 0.08);
+  border-radius: 2px;
+}
+
+.jp-poem {
+  align-self: center;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  color: var(--ink);
+  font-family: "Shippori Mincho", "Noto Serif JP", "Yu Mincho",
+    "Hiragino Mincho ProN", "Times New Roman", serif;
+  font-size: 25px;
+  font-weight: 400;
+  line-height: 2.05;
+}
+
+.en-poem {
+  grid-column: 1 / -1;
+  width: min(270px, 76%);
+  padding-top: 40px;
+  color: var(--quiet);
+  font-size: 11px;
+  line-height: 1.75;
+}
+
+.site-foot {
+  padding-top: 26px;
+}
+
+.upload-link {
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--faint);
+  background: transparent;
+  color: rgba(31, 31, 31, 0.48);
+  cursor: default;
+  font-size: 11px;
+  line-height: 1.8;
+}
+
+.upload-link:focus-visible {
+  outline: 1px solid rgba(31, 31, 31, 0.4);
+  outline-offset: 5px;
+}
+
+.position-indicator {
+  position: fixed;
+  right: max(18px, calc((100vw - 430px) / 2 + 18px));
+  bottom: max(18px, calc((100vh - var(--lane-height)) / 2 + 18px));
+  z-index: 2;
+  color: rgba(31, 31, 31, 0.2);
+  font-size: 11px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.memory-photo,
+.jp-poem,
+.en-poem {
+  opacity: 0;
+  transition: opacity 780ms ease;
+}
+
+.tanzaku.is-visible .memory-photo,
+.tanzaku.is-visible .jp-poem,
+.tanzaku.is-visible .en-poem {
+  opacity: 1;
+}
+
+.tanzaku.is-visible .jp-poem {
+  transition-delay: 70ms;
+}
+
+.tanzaku.is-visible .en-poem {
+  transition-delay: 140ms;
+}
+
+@media (min-width: 720px) {
+  body {
+    display: grid;
+    place-items: center;
+  }
+
+  :root {
+    --lane-height: min(812px, var(--screen-height));
+  }
+
+  .lane {
+    border-right: 1px solid rgba(31, 31, 31, 0.06);
+    border-left: 1px solid rgba(31, 31, 31, 0.06);
+  }
+}
+
+@media (max-width: 360px) {
+  .tanzaku {
+    padding-right: 22px;
+    padding-left: 22px;
+  }
+
+  .site-head {
+    gap: 12px;
+  }
+
+  .memory {
+    column-gap: 14px;
+  }
+
+  .jp-poem {
+    font-size: 23px;
+    line-height: 1.92;
+  }
+}
+
+@media (max-height: 700px) {
+  .tanzaku {
+    padding-top: 22px;
+    padding-bottom: 20px;
+  }
+
+  .memory {
+    padding-top: 30px;
+  }
+
+  .tanzaku:not(.is-first) .memory {
+    padding-top: 44px;
+    padding-bottom: 50px;
+  }
+
+  .memory-photo {
+    width: min(100%, 190px);
+  }
+
+  .en-poem {
+    padding-top: 26px;
+  }
+
+  .site-foot {
+    padding-top: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    opacity: 1;
+    animation: none;
+  }
+
+  .lane {
+    scroll-behavior: auto;
+  }
+
+  .memory-photo,
+  .jp-poem,
+  .en-poem {
+    opacity: 1;
+    transition: none;
+  }
+}
+
+@keyframes pageFade {
+  to {
+    opacity: 1;
+  }
+}
