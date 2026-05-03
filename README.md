@@ -22,10 +22,19 @@ It is intended for temporary deployment on Cloudflare Pages as a static site.
 - v0.2: Added five tanzaku memories and vertical scroll-snap paging.
 - v0.3: Adjusted spacing, quietness, English text weight, current-position display, and subtle opacity fade-in.
 - v0.4: Added public-facing metadata, README, and a temporary favicon for static deployment.
+- v0.5: Reduced scroll flicker by preventing repeated image fade triggers.
+- v0.6: Added a quiet local photo-selection mock for the first tanzaku.
+- v0.7: Added temporary predefined poem switching after photo selection.
+- v0.8: Added a pause so poems appear after the selected photo.
+- v0.9: Fixed the future AI poem-generation rules in `AI_GENERATION_RULES.md`.
 
 ## Thought
 
 Japan Memory Lane is not a tourism guide, social feed, or AI tool interface. It is a narrow, quiet lane for small remembered moments: photographs, vertical Japanese words, small English echoes, and enough empty space to breathe.
+
+## AI Generation Rules
+
+AI connection is still not implemented. The intended future generation behavior is documented in `AI_GENERATION_RULES.md`.
 
 ## Deploy
 
@@ -38,4 +47,3 @@ Expected public files:
 - `main.js`
 - `favicon.svg`
 - `assets/`
-
