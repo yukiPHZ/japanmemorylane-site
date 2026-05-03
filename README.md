@@ -29,6 +29,7 @@ It is intended for temporary deployment on Cloudflare Pages as a static site.
 - v0.9: Fixed the future AI poem-generation rules in `AI_GENERATION_RULES.md`.
 - v1.0: Defined the future AI API connection behavior in `AI_CONNECTION_SPEC.md`.
 - v1.1: Added a minimal Cloudflare Pages Function at `functions/api/poem.js` that returns fixed JSON.
+- v1.3: Connected `functions/api/poem.js` to the OpenAI Responses API through Cloudflare environment variables.
 
 ## Thought
 
@@ -36,10 +37,17 @@ Japan Memory Lane is not a tourism guide, social feed, or AI tool interface. It 
 
 ## AI Generation Rules
 
-AI connection is still not implemented.
+AI connection is implemented server-side through Cloudflare Pages Functions.
 
 - Writing rules are documented in `AI_GENERATION_RULES.md`.
 - API connection behavior is documented in `AI_CONNECTION_SPEC.md`.
+
+Required Cloudflare environment variables:
+
+- `OPENAI_API_KEY`: OpenAI API key used only by `functions/api/poem.js`.
+- `OPENAI_MODEL`: Optional model override. Defaults to `gpt-4o-mini`.
+
+Do not commit `.env` files or API keys to GitHub.
 
 ## Deploy
 
