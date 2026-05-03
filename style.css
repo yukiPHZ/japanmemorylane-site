@@ -123,6 +123,8 @@ button {
   object-fit: cover;
   border: 1px solid rgba(31, 31, 31, 0.08);
   border-radius: 2px;
+  backface-visibility: hidden;
+  transition: none;
 }
 
 .jp-poem {
@@ -178,25 +180,19 @@ button {
   pointer-events: none;
 }
 
-.memory-photo,
-.jp-poem,
-.en-poem {
+body.js-ready .jp-poem,
+body.js-ready .en-poem {
   opacity: 0;
-  transition: opacity 780ms ease;
+  transition: opacity 720ms ease;
 }
 
-.tanzaku.is-visible .memory-photo,
-.tanzaku.is-visible .jp-poem,
-.tanzaku.is-visible .en-poem {
+body.js-ready .tanzaku.has-been-seen .jp-poem,
+body.js-ready .tanzaku.has-been-seen .en-poem {
   opacity: 1;
 }
 
-.tanzaku.is-visible .jp-poem {
-  transition-delay: 70ms;
-}
-
-.tanzaku.is-visible .en-poem {
-  transition-delay: 140ms;
+body.js-ready .tanzaku.has-been-seen .en-poem {
+  transition-delay: 90ms;
 }
 
 @media (min-width: 720px) {
@@ -273,9 +269,8 @@ button {
     scroll-behavior: auto;
   }
 
-  .memory-photo,
-  .jp-poem,
-  .en-poem {
+  body.js-ready .jp-poem,
+  body.js-ready .en-poem {
     opacity: 1;
     transition: none;
   }
