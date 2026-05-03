@@ -27,6 +27,7 @@ It is intended for temporary deployment on Cloudflare Pages as a static site.
 - v0.7: Added temporary predefined poem switching after photo selection.
 - v0.8: Added a pause so poems appear after the selected photo.
 - v0.9: Fixed the future AI poem-generation rules in `AI_GENERATION_RULES.md`.
+- v1.0: Defined the future AI API connection behavior in `AI_CONNECTION_SPEC.md`.
 
 ## Thought
 
@@ -34,7 +35,10 @@ Japan Memory Lane is not a tourism guide, social feed, or AI tool interface. It 
 
 ## AI Generation Rules
 
-AI connection is still not implemented. The intended future generation behavior is documented in `AI_GENERATION_RULES.md`.
+AI connection is still not implemented.
+
+- Writing rules are documented in `AI_GENERATION_RULES.md`.
+- API connection behavior is documented in `AI_CONNECTION_SPEC.md`.
 
 ## Deploy
 
