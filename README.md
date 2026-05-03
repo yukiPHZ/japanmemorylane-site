@@ -2,19 +2,20 @@
 
 Japan Memory Lane is a quiet static mock for collecting small memories of Japan as vertical poems.
 
-This version is not a finished product. It is a front-end mock only:
+This version is not a finished product:
 
-- No AI connection
-- No persistent upload storage
-- No login
-- No social sharing
-- No sound or decorative effects
+- The front end is static.
+- AI poem generation runs only through Cloudflare Pages Functions.
+- There is no persistent upload storage.
+- There is no login.
+- There is no social sharing.
+- There is no sound or decorative effect.
 
 ## Current State
 
 The site is designed as a mobile-first tanzaku experience. Each screen holds one quiet memory: a photo, a vertical Japanese poem, and a small English poem.
 
-It is intended for temporary deployment on Cloudflare Pages as a static site.
+It is intended for temporary deployment on Cloudflare Pages.
 
 ## Version Notes
 
@@ -51,7 +52,21 @@ Do not commit `.env` files or API keys to GitHub.
 
 ## Deploy
 
-Cloudflare Pages can serve this folder directly as a static site.
+Cloudflare Pages can serve this folder directly as a static site with Pages Functions.
+
+Use Cloudflare Pages deploy, not Workers deploy:
+
+```bash
+npm run deploy
+```
+
+The deploy script runs:
+
+```bash
+wrangler pages deploy . --project-name japanmemorylane-site --branch main
+```
+
+Do not use `npx wrangler deploy` for this project. That command deploys a Worker and will not enable the `functions/api/poem.js` Pages Functions route.
 
 Expected public files:
 
@@ -60,4 +75,5 @@ Expected public files:
 - `main.js`
 - `favicon.svg`
 - `assets/`
-　
+- `functions/api/poem.js`
+- `_routes.json`

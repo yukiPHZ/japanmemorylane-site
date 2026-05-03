@@ -1,0 +1,4 @@
+name = "japanmemorylane-site"
+compatibility_date = "2026-05-03"
+pages_build_output_dir = "."
+
