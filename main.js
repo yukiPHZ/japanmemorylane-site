@@ -3,8 +3,34 @@ const tanzakuItems = [...document.querySelectorAll(".tanzaku")];
 const currentMemory = document.querySelector("#currentMemory");
 const quietMomentInput = document.querySelector("#quietMomentInput");
 const firstMemoryPhoto = document.querySelector("#firstMemoryPhoto");
+const firstMemoryJapanesePoem = document.querySelector(
+  "#firstMemoryJapanesePoem",
+);
+const firstMemoryEnglishPoem = document.querySelector("#firstMemoryEnglishPoem");
 const quietImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const quietImageExtensions = /\.(jpe?g|png|webp)$/i;
+const quietPoemCandidates = [
+  {
+    japanese: ["雨の匂いが", "まだ", "残っていた。"],
+    english: ["The scent of rain", "still remained."],
+  },
+  {
+    japanese: ["道の奥で", "光だけが", "待っていた。"],
+    english: ["A small light waited", "at the end of the road."],
+  },
+  {
+    japanese: ["誰もいないのに", "ちゃんと", "静かだった。"],
+    english: ["No one was there,", "yet the silence felt complete."],
+  },
+  {
+    japanese: ["電車の音だけが", "少し", "遠かった。"],
+    english: ["Only the sound of the train", "felt a little far away."],
+  },
+  {
+    japanese: ["夜は", "少しだけ", "本音になる。"],
+    english: ["The night becomes", "a little more honest."],
+  },
+];
 let settleTimer;
 let selectedPhotoUrl;
 
@@ -109,6 +135,33 @@ const isQuietImageFile = (file) => {
   return quietImageTypes.has(file.type) || quietImageExtensions.test(file.name);
 };
 
+const renderPoemLines = (element, lines) => {
+  if (!element) {
+    return;
+  }
+
+  element.replaceChildren();
+  lines.forEach((line, index) => {
+    if (index > 0) {
+      element.append(document.createElement("br"));
+    }
+
+    element.append(document.createTextNode(line));
+  });
+};
+
+const chooseQuietPoem = () =>
+  quietPoemCandidates[
+    Math.floor(Math.random() * quietPoemCandidates.length)
+  ];
+
+const replaceFirstMemoryPoems = () => {
+  const poem = chooseQuietPoem();
+
+  renderPoemLines(firstMemoryJapanesePoem, poem.japanese);
+  renderPoemLines(firstMemoryEnglishPoem, poem.english);
+};
+
 const replaceFirstMemoryPhoto = (file) => {
   if (!firstMemoryPhoto || !isQuietImageFile(file)) {
     return;
@@ -125,6 +178,7 @@ const replaceFirstMemoryPhoto = (file) => {
     selectedPhotoUrl = nextPhotoUrl;
     firstMemoryPhoto.src = selectedPhotoUrl;
     firstMemoryPhoto.alt = "A quiet moment selected for Japan Memory Lane";
+    replaceFirstMemoryPoems();
   };
 
   image.onerror = () => {
