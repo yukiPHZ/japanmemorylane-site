@@ -36,6 +36,7 @@ let settleTimer;
 let japanesePoemTimer;
 let englishPoemTimer;
 let selectedPhotoUrl;
+let poemRequestId = 0;
 
 const setScreenHeight = () => {
   document.documentElement.style.setProperty(
@@ -158,6 +159,52 @@ const chooseQuietPoem = () =>
     Math.floor(Math.random() * quietPoemCandidates.length)
   ];
 
+const splitPoemLines = (poem) =>
+  String(poem || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+const normalizePoem = (poem) => {
+  const japanese = Array.isArray(poem?.japanese)
+    ? poem.japanese
+    : splitPoemLines(poem?.japanese_poem);
+  const english = Array.isArray(poem?.english)
+    ? poem.english
+    : splitPoemLines(poem?.english_poem);
+
+  if (japanese.length === 0 || english.length === 0) {
+    return null;
+  }
+
+  return {
+    japanese: japanese.slice(0, 3),
+    english: english.slice(0, 2),
+  };
+};
+
+const requestPoem = async (file) => {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const response = await fetch("/api/poem", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Poem request failed with ${response.status}`);
+  }
+
+  const poem = normalizePoem(await response.json());
+
+  if (!poem) {
+    throw new Error("Poem response was invalid");
+  }
+
+  return poem;
+};
+
 const clearPoemRevealTimers = () => {
   window.clearTimeout(japanesePoemTimer);
   window.clearTimeout(englishPoemTimer);
@@ -186,14 +233,32 @@ const revealFirstMemoryPoems = () => {
   }, 1870);
 };
 
-const replaceFirstMemoryPoemsAfterPause = () => {
-  const poem = chooseQuietPoem();
+const replaceFirstMemoryPoemsAfterPause = (poem) => {
+  const nextPoem = normalizePoem(poem) || chooseQuietPoem();
 
-  clearPoemRevealTimers();
-  setPoemsWaiting();
-  renderPoemLines(firstMemoryJapanesePoem, poem.japanese);
-  renderPoemLines(firstMemoryEnglishPoem, poem.english);
+  renderPoemLines(firstMemoryJapanesePoem, nextPoem.japanese);
+  renderPoemLines(firstMemoryEnglishPoem, nextPoem.english);
   revealFirstMemoryPoems();
+};
+
+const replaceFirstMemoryPoemsFromApi = async (file, requestId) => {
+  try {
+    const poem = await requestPoem(file);
+
+    if (requestId !== poemRequestId) {
+      return;
+    }
+
+    replaceFirstMemoryPoemsAfterPause(poem);
+  } catch (error) {
+    console.error(error);
+
+    if (requestId !== poemRequestId) {
+      return;
+    }
+
+    replaceFirstMemoryPoemsAfterPause(chooseQuietPoem());
+  }
 };
 
 const replaceFirstMemoryPhoto = (file) => {
@@ -201,13 +266,16 @@ const replaceFirstMemoryPhoto = (file) => {
     return;
   }
 
+  const requestId = ++poemRequestId;
   const nextPhotoUrl = URL.createObjectURL(file);
   const previousPhotoUrl = selectedPhotoUrl;
 
   selectedPhotoUrl = nextPhotoUrl;
   firstMemoryPhoto.src = selectedPhotoUrl;
   firstMemoryPhoto.alt = "A quiet moment selected for Japan Memory Lane";
-  replaceFirstMemoryPoemsAfterPause();
+  clearPoemRevealTimers();
+  setPoemsWaiting();
+  replaceFirstMemoryPoemsFromApi(file, requestId);
 
   if (previousPhotoUrl) {
     URL.revokeObjectURL(previousPhotoUrl);

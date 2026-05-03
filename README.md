@@ -5,7 +5,7 @@ Japan Memory Lane is a quiet static mock for collecting small memories of Japan 
 This version is not a finished product. It is a front-end mock only:
 
 - No AI connection
-- No upload backend
+- No persistent upload storage
 - No login
 - No social sharing
 - No sound or decorative effects
@@ -28,6 +28,7 @@ It is intended for temporary deployment on Cloudflare Pages as a static site.
 - v0.8: Added a pause so poems appear after the selected photo.
 - v0.9: Fixed the future AI poem-generation rules in `AI_GENERATION_RULES.md`.
 - v1.0: Defined the future AI API connection behavior in `AI_CONNECTION_SPEC.md`.
+- v1.1: Added a minimal Cloudflare Pages Function at `functions/api/poem.js` that returns fixed JSON.
 
 ## Thought
 
