@@ -52,3 +52,4 @@ Expected public files:
 - `main.js`
 - `favicon.svg`
 - `assets/`
+　
