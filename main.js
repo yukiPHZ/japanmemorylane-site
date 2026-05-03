@@ -1,7 +1,12 @@
 const lane = document.querySelector(".lane");
 const tanzakuItems = [...document.querySelectorAll(".tanzaku")];
 const currentMemory = document.querySelector("#currentMemory");
+const quietMomentInput = document.querySelector("#quietMomentInput");
+const firstMemoryPhoto = document.querySelector("#firstMemoryPhoto");
+const quietImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+const quietImageExtensions = /\.(jpe?g|png|webp)$/i;
 let settleTimer;
+let selectedPhotoUrl;
 
 const setScreenHeight = () => {
   document.documentElement.style.setProperty(
@@ -95,3 +100,56 @@ window.addEventListener("resize", () => {
 if (lane) {
   lane.addEventListener("scroll", queueSettleUpdate, { passive: true });
 }
+
+const isQuietImageFile = (file) => {
+  if (!file) {
+    return false;
+  }
+
+  return quietImageTypes.has(file.type) || quietImageExtensions.test(file.name);
+};
+
+const replaceFirstMemoryPhoto = (file) => {
+  if (!firstMemoryPhoto || !isQuietImageFile(file)) {
+    return;
+  }
+
+  const nextPhotoUrl = URL.createObjectURL(file);
+  const image = new Image();
+
+  image.onload = () => {
+    if (selectedPhotoUrl) {
+      URL.revokeObjectURL(selectedPhotoUrl);
+    }
+
+    selectedPhotoUrl = nextPhotoUrl;
+    firstMemoryPhoto.src = selectedPhotoUrl;
+    firstMemoryPhoto.alt = "A quiet moment selected for Japan Memory Lane";
+  };
+
+  image.onerror = () => {
+    URL.revokeObjectURL(nextPhotoUrl);
+  };
+
+  image.src = nextPhotoUrl;
+};
+
+if (quietMomentInput) {
+  quietMomentInput.addEventListener("change", () => {
+    const [file] = quietMomentInput.files;
+
+    if (!isQuietImageFile(file)) {
+      quietMomentInput.value = "";
+      return;
+    }
+
+    replaceFirstMemoryPhoto(file);
+    quietMomentInput.value = "";
+  });
+}
+
+window.addEventListener("beforeunload", () => {
+  if (selectedPhotoUrl) {
+    URL.revokeObjectURL(selectedPhotoUrl);
+  }
+});

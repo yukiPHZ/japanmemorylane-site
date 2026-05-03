@@ -149,10 +149,12 @@ button {
 }
 
 .site-foot {
+  position: relative;
   padding-top: 26px;
 }
 
 .upload-link {
+  display: block;
   width: fit-content;
   padding: 0;
   border: 0;
@@ -164,9 +166,21 @@ button {
   line-height: 1.8;
 }
 
-.upload-link:focus-visible {
+.upload-link:focus-within {
   outline: 1px solid rgba(31, 31, 31, 0.4);
   outline-offset: 5px;
+}
+
+.quiet-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  border: 0;
+  white-space: nowrap;
 }
 
 .position-indicator {

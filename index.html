@@ -35,6 +35,7 @@
       <div class="memory">
         <figure class="memory-photo">
           <img
+            id="firstMemoryPhoto"
             src="./assets/quiet-window-rain.jpg"
             alt="A quiet rainy window in Japan"
           />
@@ -53,9 +54,16 @@
       </div>
 
       <footer class="site-foot">
-        <button class="upload-link" type="button">
+        <label class="upload-link">
           Upload a quiet moment in Japan.
-        </button>
+          <input
+            class="quiet-file-input"
+            id="quietMomentInput"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            aria-label="Upload a quiet moment in Japan"
+          />
+        </label>
       </footer>
     </section>
 
