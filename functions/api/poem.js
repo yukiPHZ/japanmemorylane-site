@@ -147,6 +147,12 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
     throw new Error("Image too large");
   }
 
+  console.log("Japan Memory Lane poem request", {
+    model,
+    imageType: file.type,
+    imageBytes: arrayBuffer.byteLength,
+  });
+
   const imageUrl = `data:${file.type};base64,${toBase64(arrayBuffer)}`;
   const response = await fetch(OPENAI_RESPONSES_URL, {
     method: "POST",
@@ -183,13 +189,27 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
       store: false,
     }),
   });
+  const responseTextBody = await response.text();
+
+  console.log("OpenAI API response status", {
+    status: response.status,
+    ok: response.ok,
+  });
 
   if (!response.ok) {
+    console.error("OpenAI API error response", {
+      status: response.status,
+      body: responseTextBody.slice(0, 2000),
+    });
     throw new Error(`OpenAI request failed with ${response.status}`);
   }
 
-  const responseBody = await response.json();
+  console.log("OpenAI API response body", responseTextBody.slice(0, 4000));
+
+  const responseBody = JSON.parse(responseTextBody);
   const responseText = extractResponseText(responseBody);
+
+  console.log("OpenAI output text", responseText.slice(0, 1000));
 
   return validatePoem(JSON.parse(responseText));
 };
@@ -203,6 +223,7 @@ export async function onRequest({ request, env }) {
     const apiKey = env?.OPENAI_API_KEY;
 
     if (!apiKey) {
+      console.error("OPENAI_API_KEY is not configured");
       throw new Error("OPENAI_API_KEY is not configured");
     }
 
@@ -225,9 +246,18 @@ export async function onRequest({ request, env }) {
       file: image,
     });
 
+    console.log("Poem JSON validated", {
+      japaneseLength: poem.japanese_poem.length,
+      englishLength: poem.english_poem.length,
+      moodTags: poem.mood_tags,
+    });
+
     return json(poem);
   } catch (error) {
-    console.error(error);
+    console.error("Poem generation failed", {
+      message: error?.message,
+      stack: error?.stack,
+    });
     return json({ error: "poem_generation_failed" }, { status: 500 });
   }
 }
