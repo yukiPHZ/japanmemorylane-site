@@ -209,6 +209,18 @@ body.js-ready .tanzaku.has-been-seen .en-poem {
   transition-delay: 90ms;
 }
 
+body.js-ready .tanzaku.is-poem-waiting .jp-poem,
+body.js-ready .tanzaku.is-poem-waiting .en-poem {
+  opacity: 0;
+  transition: none;
+}
+
+body.js-ready .tanzaku.is-poem-waiting.show-japanese-poem .jp-poem,
+body.js-ready .tanzaku.is-poem-waiting.show-english-poem .en-poem {
+  opacity: 1;
+  transition: opacity 760ms ease;
+}
+
 @media (min-width: 720px) {
   body {
     display: grid;
@@ -284,7 +296,9 @@ body.js-ready .tanzaku.has-been-seen .en-poem {
   }
 
   body.js-ready .jp-poem,
-  body.js-ready .en-poem {
+  body.js-ready .en-poem,
+  body.js-ready .tanzaku.is-poem-waiting .jp-poem,
+  body.js-ready .tanzaku.is-poem-waiting .en-poem {
     opacity: 1;
     transition: none;
   }

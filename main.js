@@ -9,6 +9,7 @@ const firstMemoryJapanesePoem = document.querySelector(
 const firstMemoryEnglishPoem = document.querySelector("#firstMemoryEnglishPoem");
 const quietImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const quietImageExtensions = /\.(jpe?g|png|webp)$/i;
+const firstTanzaku = firstMemoryPhoto?.closest(".tanzaku");
 const quietPoemCandidates = [
   {
     japanese: ["雨の匂いが", "まだ", "残っていた。"],
@@ -32,6 +33,8 @@ const quietPoemCandidates = [
   },
 ];
 let settleTimer;
+let japanesePoemTimer;
+let englishPoemTimer;
 let selectedPhotoUrl;
 
 const setScreenHeight = () => {
@@ -155,11 +158,42 @@ const chooseQuietPoem = () =>
     Math.floor(Math.random() * quietPoemCandidates.length)
   ];
 
-const replaceFirstMemoryPoems = () => {
+const clearPoemRevealTimers = () => {
+  window.clearTimeout(japanesePoemTimer);
+  window.clearTimeout(englishPoemTimer);
+};
+
+const setPoemsWaiting = () => {
+  if (!firstTanzaku) {
+    return;
+  }
+
+  firstTanzaku.classList.add("is-poem-waiting");
+  firstTanzaku.classList.remove("show-japanese-poem", "show-english-poem");
+};
+
+const revealFirstMemoryPoems = () => {
+  if (!firstTanzaku) {
+    return;
+  }
+
+  japanesePoemTimer = window.setTimeout(() => {
+    firstTanzaku.classList.add("show-japanese-poem");
+  }, 1350);
+
+  englishPoemTimer = window.setTimeout(() => {
+    firstTanzaku.classList.add("show-english-poem");
+  }, 1870);
+};
+
+const replaceFirstMemoryPoemsAfterPause = () => {
   const poem = chooseQuietPoem();
 
+  clearPoemRevealTimers();
+  setPoemsWaiting();
   renderPoemLines(firstMemoryJapanesePoem, poem.japanese);
   renderPoemLines(firstMemoryEnglishPoem, poem.english);
+  revealFirstMemoryPoems();
 };
 
 const replaceFirstMemoryPhoto = (file) => {
@@ -168,24 +202,16 @@ const replaceFirstMemoryPhoto = (file) => {
   }
 
   const nextPhotoUrl = URL.createObjectURL(file);
-  const image = new Image();
+  const previousPhotoUrl = selectedPhotoUrl;
 
-  image.onload = () => {
-    if (selectedPhotoUrl) {
-      URL.revokeObjectURL(selectedPhotoUrl);
-    }
+  selectedPhotoUrl = nextPhotoUrl;
+  firstMemoryPhoto.src = selectedPhotoUrl;
+  firstMemoryPhoto.alt = "A quiet moment selected for Japan Memory Lane";
+  replaceFirstMemoryPoemsAfterPause();
 
-    selectedPhotoUrl = nextPhotoUrl;
-    firstMemoryPhoto.src = selectedPhotoUrl;
-    firstMemoryPhoto.alt = "A quiet moment selected for Japan Memory Lane";
-    replaceFirstMemoryPoems();
-  };
-
-  image.onerror = () => {
-    URL.revokeObjectURL(nextPhotoUrl);
-  };
-
-  image.src = nextPhotoUrl;
+  if (previousPhotoUrl) {
+    URL.revokeObjectURL(previousPhotoUrl);
+  }
 };
 
 if (quietMomentInput) {
@@ -203,6 +229,8 @@ if (quietMomentInput) {
 }
 
 window.addEventListener("beforeunload", () => {
+  clearPoemRevealTimers();
+
   if (selectedPhotoUrl) {
     URL.revokeObjectURL(selectedPhotoUrl);
   }
