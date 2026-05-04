@@ -31,6 +31,7 @@ It is intended for temporary deployment on Cloudflare Pages.
 - v1.0: Defined the future AI API connection behavior in `AI_CONNECTION_SPEC.md`.
 - v1.1: Added a minimal Cloudflare Pages Function at `functions/api/poem.js` that returns fixed JSON.
 - v1.3: Connected `functions/api/poem.js` to the OpenAI Responses API through Cloudflare environment variables.
+- v1.5: Strengthened image-aware generation so the model uses one visible detail from the uploaded photo instead of generic quiet phrasing.
 
 ## Thought
 
@@ -42,6 +43,8 @@ AI connection is implemented server-side through Cloudflare Pages Functions.
 
 - Writing rules are documented in `AI_GENERATION_RULES.md`.
 - API connection behavior is documented in `AI_CONNECTION_SPEC.md`.
+- Uploaded images are read from multipart form data, converted to a base64 data URL, and sent to OpenAI as an `input_image` from `functions/api/poem.js`.
+- Function logs include image type, image bytes, OpenAI status, output text head, poem lengths, and mood tags. API keys, full base64 strings, and image bodies must never be logged.
 
 Required Cloudflare environment variables:
 

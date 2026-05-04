@@ -1,6 +1,6 @@
-# Japan Memory Lane AI Generation Rules v0.9
+# Japan Memory Lane AI Generation Rules v1.5
 
-This document fixes the generation rules for the future AI connection.
+This document fixes the rules for image-aware poem generation.
 
 The AI must not be the main experience. It should only help a selected photo become a quiet memory on a tanzaku.
 
@@ -13,18 +13,21 @@ The generated words should feel like a small trace placed beside the photo:
 - quiet
 - short
 - restrained
+- based on one visible detail
 - suitable for vertical Japanese writing
 - supported by a small English interpretation
 
+This is not caption generation. The model should look at the photo, pick one small trace, and leave space.
+
 ## Expected JSON
 
-The future AI endpoint should return only JSON.
+The endpoint must return only JSON.
 
 ```json
 {
-  "japanese_poem": "窓に\n雨の跡が\n残っていた",
-  "english_poem": "The rain had stopped,\nbut the window still remembered.",
-  "mood_tags": ["rain", "quiet", "memory"]
+  "japanese_poem": "しめ縄の下だけ\n風が\n遅かった",
+  "english_poem": "Under the sacred rope,\nthe wind seemed slower.",
+  "mood_tags": ["shrine", "wind", "quiet"]
 }
 ```
 
@@ -35,7 +38,23 @@ Rules:
 - Do not include explanations.
 - `japanese_poem` should contain 1 to 3 lines.
 - `english_poem` should contain 1 to 2 lines.
-- `mood_tags` should contain short lowercase English tags.
+- `mood_tags` should contain 1 to 5 short lowercase English tags.
+
+## Image Rules
+
+The model must look at the uploaded image.
+
+It should:
+
+- pick exactly one small visible detail from the photo
+- use that detail indirectly
+- avoid generic quiet poems
+- avoid prepared-sounding phrases
+- avoid mentioning everything in the photo
+- avoid inventing details that are not visible
+- avoid forcing Japan when no clear Japan marker is visible
+
+Good details include a rope, wet stone, window edge, sign, shadow, rail, step, curtain, reflection, vending-machine button, shrine paper, puddle, leaf, wire, or tile.
 
 ## Japanese Poem Rules
 
@@ -46,30 +65,35 @@ It should be:
 - 1 to 3 lines
 - short
 - natural
-- quiet
+- sparse
+- observational rather than explanatory
 - visually beautiful in vertical writing
-- sparse enough to leave space
 
 It should:
 
+- pick one concrete thing
+- avoid turning the photo into a caption
 - reduce explicit subjects
-- avoid explaining the photo
 - avoid naming emotions too directly
-- notice small traces of season, light, sound, distance, rain, time, silence, or presence
 - avoid tourism language
 - avoid social-media language
 - avoid forced poetry
 - avoid dramatic or self-important phrasing
+- vary sentence shape
+- let punctuation appear only when natural
 
-Avoid saying words like:
+Avoid overusing:
 
+- 光
+- 静か
+- 遠い
+- 待っていた
+- 少し
+- だけ
 - 美しい
 - 懐かしい
-- 感動
-- 最高
-- 特別
 
-These can be implied, but should not be announced.
+These ideas can be implied, but should not be announced.
 
 ## English Poem Rules
 
@@ -77,10 +101,10 @@ The English poem is secondary.
 
 It should:
 
+- support the Japanese
 - be a gentle interpretation, not a direct translation
 - be 1 to 2 lines
 - stay short
-- support the Japanese
 - remain quieter than the Japanese
 - avoid becoming a complete caption by itself
 - avoid being too poetic
@@ -104,9 +128,16 @@ Avoid words and phrases such as:
 - must-see
 - perfect spot
 
+Also avoid common generic poem phrases such as:
+
+- a small light waited
+- the silence felt complete
+- a little far away
+- the night remembered
+
 ## Generation Prompt
 
-Use this prompt as the baseline for the future AI request.
+Use this prompt as the baseline for the API request.
 
 ```text
 You are writing for Japan Memory Lane.
@@ -115,32 +146,47 @@ This is not a travel guide.
 This is not an AI caption generator.
 This is a quiet memory of Japan.
 
-Look at the uploaded photo.
-Find only a small trace of atmosphere:
-light, rain, silence, sound, distance, season, time, or stillness.
+You must look at the uploaded image before writing.
+Do not write a generic quiet poem.
+Do not reuse prepared-sounding phrases.
+
+Pick exactly one small visual detail from the photo:
+a rope, wet stone, window edge, sign, shadow, rail, step, curtain, reflection,
+vending-machine button, shrine paper, puddle, leaf, wire, tile, or another visible thing.
+Use that detail indirectly.
+Do not mention everything in the photo.
+Do not invent details that are not visible.
+If the photo has no obvious Japan marker, use a visible detail instead of forcing Japan.
 
 Write a short Japanese poem first.
 The Japanese must be natural, quiet, and suitable for vertical writing.
+Use 1 to 3 short lines.
+Reduce explicit subjects.
+Pick one concrete thing, but do not turn it into a caption.
 Do not explain the photo.
 Do not describe everything.
 Do not say emotions directly.
 Do not use dramatic or overly poetic words.
+Do not use tourism, advertising, influencer, motivational, or fantasy language.
+Avoid words like miracle, magic, dream, soul, destiny, eternal, hidden gem, must-see, and perfect spot.
+Avoid overusing common quiet-poem words such as light, silence, distant, waiting, little, stillness.
+Avoid repeating common Japanese words and endings such as 光, 静か, 遠い, 待っていた, 少し, だけ.
+Vary the sentence shape.
+Let punctuation appear only when it feels natural.
 Leave space.
 
 Then write a small English poem as a gentle interpretation.
 The English should support the Japanese, not replace it.
+Use 1 to 2 short lines.
+Keep it quieter than the Japanese.
+Do not make the English a full caption.
 
-Return only JSON:
-{
-  "japanese_poem": "...",
-  "english_poem": "...",
-  "mood_tags": ["...", "...", "..."]
-}
+Return only JSON.
 ```
 
 ## Test Themes
 
-Use these themes before connecting the AI to user uploads:
+Use these themes before accepting the image-aware behavior:
 
 - 雨の窓
 - 遠い電車
@@ -157,10 +203,11 @@ Use these themes before connecting the AI to user uploads:
 
 Before accepting generated output, check:
 
+- The uploaded image is sent as an `input_image`.
+- The Japanese picks one visible detail from the photo.
 - The Japanese looks good in vertical writing.
 - The English does not compete with the Japanese.
 - The output is not a photo description.
 - The output is not tourism copy.
 - The output does not feel like an AI caption.
 - The words leave space around the photo.
-

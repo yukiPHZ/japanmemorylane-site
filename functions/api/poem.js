@@ -1,5 +1,6 @@
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_MODEL = "gpt-4o-mini";
+const IMAGE_DETAIL = "high";
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set([
   "image/jpeg",
@@ -35,26 +36,40 @@ This is not a travel guide.
 This is not an AI caption generator.
 This is a quiet memory of Japan.
 
-Look at the uploaded photo.
-Find only a small trace of atmosphere:
-light, rain, silence, sound, distance, season, time, or stillness.
+You must look at the uploaded image before writing.
+Do not write a generic quiet poem.
+Do not reuse prepared-sounding phrases.
+
+Pick exactly one small visual detail from the photo:
+a rope, wet stone, window edge, sign, shadow, rail, step, curtain, reflection,
+vending-machine button, shrine paper, puddle, leaf, wire, tile, or another visible thing.
+Use that detail indirectly.
+Do not mention everything in the photo.
+Do not invent details that are not visible.
+If the photo has no obvious Japan marker, use a visible detail instead of forcing Japan.
 
 Write a short Japanese poem first.
 The Japanese must be natural, quiet, and suitable for vertical writing.
 Use 1 to 3 short lines.
 Reduce explicit subjects.
+Pick one concrete thing, but do not turn it into a caption.
 Do not explain the photo.
 Do not describe everything.
 Do not say emotions directly.
 Do not use dramatic or overly poetic words.
 Do not use tourism, advertising, influencer, motivational, or fantasy language.
 Avoid words like miracle, magic, dream, soul, destiny, eternal, hidden gem, must-see, and perfect spot.
+Avoid overusing common quiet-poem words such as light, silence, distant, waiting, little, stillness.
+Avoid repeating common Japanese words and endings such as 光, 静か, 遠い, 待っていた, 少し, だけ.
+Vary the sentence shape.
+Let punctuation appear only when it feels natural.
 Leave space.
 
 Then write a small English poem as a gentle interpretation.
 The English should support the Japanese, not replace it.
 Use 1 to 2 short lines.
 Keep it quieter than the Japanese.
+Do not make the English a full caption.
 
 Return only JSON.`;
 
@@ -120,12 +135,18 @@ const extractResponseText = (responseBody) => {
 const validatePoem = (poem) => {
   const japanesePoem = poem?.japanese_poem;
   const englishPoem = poem?.english_poem;
-  const moodTags = poem?.mood_tags;
+  const moodTags = Array.isArray(poem?.mood_tags)
+    ? poem.mood_tags
+        .filter((tag) => typeof tag === "string")
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+        .slice(0, 5)
+    : null;
 
   if (
     typeof japanesePoem !== "string" ||
     typeof englishPoem !== "string" ||
-    !Array.isArray(moodTags) ||
+    !moodTags ||
     moodTags.length < 1 ||
     moodTags.length > 5 ||
     !moodTags.every((tag) => typeof tag === "string")
@@ -136,7 +157,7 @@ const validatePoem = (poem) => {
   return {
     japanese_poem: japanesePoem.trim(),
     english_poem: englishPoem.trim(),
-    mood_tags: moodTags.map((tag) => tag.trim()).filter(Boolean).slice(0, 5),
+    mood_tags: moodTags,
   };
 };
 
@@ -147,10 +168,15 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
     throw new Error("Image too large");
   }
 
+  if (arrayBuffer.byteLength === 0) {
+    throw new Error("Image is empty");
+  }
+
   console.log("Japan Memory Lane poem request", {
     model,
     imageType: file.type,
     imageBytes: arrayBuffer.byteLength,
+    imageDetail: IMAGE_DETAIL,
   });
 
   const imageUrl = `data:${file.type};base64,${toBase64(arrayBuffer)}`;
@@ -173,7 +199,7 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
             {
               type: "input_image",
               image_url: imageUrl,
-              detail: "low",
+              detail: IMAGE_DETAIL,
             },
           ],
         },
@@ -204,12 +230,10 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
     throw new Error(`OpenAI request failed with ${response.status}`);
   }
 
-  console.log("OpenAI API response body", responseTextBody.slice(0, 4000));
-
   const responseBody = JSON.parse(responseTextBody);
   const responseText = extractResponseText(responseBody);
 
-  console.log("OpenAI output text", responseText.slice(0, 1000));
+  console.log("OpenAI output text head", responseText.slice(0, 1000));
 
   return validatePoem(JSON.parse(responseText));
 };
@@ -220,13 +244,6 @@ export async function onRequest({ request, env }) {
   }
 
   try {
-    const apiKey = env?.OPENAI_API_KEY;
-
-    if (!apiKey) {
-      console.error("OPENAI_API_KEY is not configured");
-      throw new Error("OPENAI_API_KEY is not configured");
-    }
-
     const contentType = request.headers.get("content-type") || "";
 
     if (!contentType.toLowerCase().includes("multipart/form-data")) {
@@ -237,7 +254,17 @@ export async function onRequest({ request, env }) {
     const image = formData.get("image");
 
     if (!isImageFile(image)) {
+      console.error("Poem image was missing or unsupported", {
+        imageType: image?.type || null,
+      });
       return json({ error: "unsupported_image" }, { status: 400 });
+    }
+
+    const apiKey = env?.OPENAI_API_KEY;
+
+    if (!apiKey) {
+      console.error("OPENAI_API_KEY is not configured");
+      throw new Error("OPENAI_API_KEY is not configured");
     }
 
     const poem = await requestOpenAIPoem({
