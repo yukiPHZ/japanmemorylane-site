@@ -39,7 +39,7 @@ Japan Memory Lane is not a tourism guide, social feed, or AI tool interface. It 
 
 ## AI Generation Rules
 
-AI connection is implemented server-side through Cloudflare Pages Functions.
+AI connection is implemented server-side through Cloudflare Pages Functions.　
 
 - Writing rules are documented in `AI_GENERATION_RULES.md`.
 - API connection behavior is documented in `AI_CONNECTION_SPEC.md`.
