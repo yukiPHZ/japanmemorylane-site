@@ -32,6 +32,7 @@ It is intended for temporary deployment on Cloudflare Pages.
 - v1.1: Added a minimal Cloudflare Pages Function at `functions/api/poem.js` that returns fixed JSON.
 - v1.3: Connected `functions/api/poem.js` to the OpenAI Responses API through Cloudflare environment variables.
 - v1.5: Strengthened image-aware generation so the model uses one visible detail from the uploaded photo instead of generic quiet phrasing.
+- v1.6: Removed the old fixed fallback poem and added trace logs for API output, parsed poems, frontend JSON, and rendered text.
 
 ## Thought
 

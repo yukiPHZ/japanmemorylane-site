@@ -234,8 +234,14 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
   const responseText = extractResponseText(responseBody);
 
   console.log("OpenAI output text head", responseText.slice(0, 1000));
+  console.log("OpenAI raw output", responseText);
 
-  return validatePoem(JSON.parse(responseText));
+  const parsedPoem = JSON.parse(responseText);
+
+  console.log("Parsed Japanese poem", parsedPoem?.japanese_poem);
+  console.log("Parsed English poem", parsedPoem?.english_poem);
+
+  return validatePoem(parsedPoem);
 };
 
 export async function onRequest({ request, env }) {

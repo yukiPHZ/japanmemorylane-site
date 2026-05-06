@@ -10,28 +10,10 @@ const firstMemoryEnglishPoem = document.querySelector("#firstMemoryEnglishPoem")
 const quietImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const quietImageExtensions = /\.(jpe?g|png|webp)$/i;
 const firstTanzaku = firstMemoryPhoto?.closest(".tanzaku");
-const quietPoemCandidates = [
-  {
-    japanese: ["雨の匂いが", "まだ", "残っていた。"],
-    english: ["The scent of rain", "still remained."],
-  },
-  {
-    japanese: ["道の奥で", "光だけが", "待っていた。"],
-    english: ["A small light waited", "at the end of the road."],
-  },
-  {
-    japanese: ["誰もいないのに", "ちゃんと", "静かだった。"],
-    english: ["No one was there,", "yet the silence felt complete."],
-  },
-  {
-    japanese: ["電車の音だけが", "少し", "遠かった。"],
-    english: ["Only the sound of the train", "felt a little far away."],
-  },
-  {
-    japanese: ["夜は", "少しだけ", "本音になる。"],
-    english: ["The night becomes", "a little more honest."],
-  },
-];
+const fallbackPoem = {
+  japanese: ["……"],
+  english: ["……"],
+};
 let settleTimer;
 let japanesePoemTimer;
 let englishPoemTimer;
@@ -154,10 +136,7 @@ const renderPoemLines = (element, lines) => {
   });
 };
 
-const chooseQuietPoem = () =>
-  quietPoemCandidates[
-    Math.floor(Math.random() * quietPoemCandidates.length)
-  ];
+const chooseQuietPoem = () => fallbackPoem;
 
 const splitPoemLines = (poem) =>
   String(poem || "")
@@ -196,7 +175,11 @@ const requestPoem = async (file) => {
     throw new Error(`Poem request failed with ${response.status}`);
   }
 
-  const poem = normalizePoem(await response.json());
+  const responseJson = await response.json();
+
+  console.log("Japan Memory Lane frontend received json", responseJson);
+
+  const poem = normalizePoem(responseJson);
 
   if (!poem) {
     throw new Error("Poem response was invalid");
@@ -236,6 +219,11 @@ const revealFirstMemoryPoems = () => {
 const replaceFirstMemoryPoemsAfterPause = (poem) => {
   const nextPoem = normalizePoem(poem) || chooseQuietPoem();
 
+  console.log("Japan Memory Lane frontend render text", {
+    japanese: nextPoem.japanese.join("\n"),
+    english: nextPoem.english.join("\n"),
+  });
+
   renderPoemLines(firstMemoryJapanesePoem, nextPoem.japanese);
   renderPoemLines(firstMemoryEnglishPoem, nextPoem.english);
   revealFirstMemoryPoems();
@@ -246,14 +234,22 @@ const replaceFirstMemoryPoemsFromApi = async (file, requestId) => {
     const poem = await requestPoem(file);
 
     if (requestId !== poemRequestId) {
+      console.log("Japan Memory Lane ignored stale poem response", {
+        requestId,
+        currentRequestId: poemRequestId,
+      });
       return;
     }
 
     replaceFirstMemoryPoemsAfterPause(poem);
   } catch (error) {
-    console.error(error);
+    console.error("Japan Memory Lane poem request failed; using fallback", error);
 
     if (requestId !== poemRequestId) {
+      console.log("Japan Memory Lane ignored stale poem fallback", {
+        requestId,
+        currentRequestId: poemRequestId,
+      });
       return;
     }
 
