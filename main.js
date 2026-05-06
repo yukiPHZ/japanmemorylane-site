@@ -142,9 +142,30 @@ const renderPoemLines = (element, lines) => {
 
 const chooseQuietPoem = () => fallbackPoem;
 
+const renderLoadingJapanesePoem = () => {
+  if (!firstMemoryJapanesePoem) {
+    return;
+  }
+
+  firstMemoryJapanesePoem.replaceChildren();
+  [...loadingPoem.japanese[0]].forEach((character, index) => {
+    const characterElement = document.createElement("span");
+    characterElement.className = "loading-kana";
+    characterElement.style.setProperty("--loading-delay", `${index * 0.38}s`);
+    characterElement.append(document.createTextNode(character));
+    firstMemoryJapanesePoem.append(characterElement);
+  });
+};
+
 const showLoadingPoem = () => {
-  renderPoemLines(firstMemoryJapanesePoem, loadingPoem.japanese);
+  renderLoadingJapanesePoem();
   renderPoemLines(firstMemoryEnglishPoem, loadingPoem.english);
+
+  console.log("Japan Memory Lane frontend render text", {
+    source: "loading",
+    japanese: loadingPoem.japanese.join("\n"),
+    english: loadingPoem.english.join("\n"),
+  });
 };
 
 const splitPoemLines = (poem) =>
@@ -180,13 +201,22 @@ const requestPoem = async (file) => {
     body: formData,
   });
 
+  console.log("Japan Memory Lane API response", {
+    source: response.ok ? "api" : "fallback",
+    status: response.status,
+    ok: response.ok,
+  });
+
   if (!response.ok) {
     throw new Error(`Poem request failed with ${response.status}`);
   }
 
   const responseJson = await response.json();
 
-  console.log("Japan Memory Lane frontend received json", responseJson);
+  console.log("Japan Memory Lane frontend received json", {
+    source: "api",
+    json: responseJson,
+  });
 
   const poem = normalizePoem(responseJson);
 
@@ -226,14 +256,17 @@ const revealFirstMemoryPoems = () => {
   }, 1870);
 };
 
-const replaceFirstMemoryPoemsAfterPause = (poem) => {
-  const nextPoem = normalizePoem(poem) || chooseQuietPoem();
+const replaceFirstMemoryPoemsAfterPause = (poem, source = "api") => {
+  const normalizedPoem = normalizePoem(poem);
+  const renderSource = normalizedPoem ? source : "fallback";
+  const nextPoem = normalizedPoem || chooseQuietPoem();
 
   if (firstTanzaku) {
     firstTanzaku.classList.remove("is-poem-loading");
   }
 
   console.log("Japan Memory Lane frontend render text", {
+    source: renderSource,
     japanese: nextPoem.japanese.join("\n"),
     english: nextPoem.english.join("\n"),
   });
@@ -255,9 +288,12 @@ const replaceFirstMemoryPoemsFromApi = async (file, requestId) => {
       return;
     }
 
-    replaceFirstMemoryPoemsAfterPause(poem);
+    replaceFirstMemoryPoemsAfterPause(poem, "api");
   } catch (error) {
-    console.error("Japan Memory Lane poem request failed; using fallback", error);
+    console.error("Japan Memory Lane poem request failed; using fallback", {
+      source: "fallback",
+      message: error?.message,
+    });
 
     if (requestId !== poemRequestId) {
       console.log("Japan Memory Lane ignored stale poem fallback", {
@@ -267,7 +303,7 @@ const replaceFirstMemoryPoemsFromApi = async (file, requestId) => {
       return;
     }
 
-    replaceFirstMemoryPoemsAfterPause(chooseQuietPoem());
+    replaceFirstMemoryPoemsAfterPause(chooseQuietPoem(), "fallback");
   }
 };
 

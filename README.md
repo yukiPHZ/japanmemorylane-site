@@ -33,6 +33,8 @@ It is intended for temporary deployment on Cloudflare Pages.
 - v1.3: Connected `functions/api/poem.js` to the OpenAI Responses API through Cloudflare environment variables.
 - v1.5: Strengthened image-aware generation so the model uses one visible detail from the uploaded photo instead of generic quiet phrasing.
 - v1.6: Removed the old fixed fallback poem and added trace logs for API output, parsed poems, frontend JSON, and rendered text.
+- v1.7: Split the loading poem from fallback so the waiting state reads as quiet space, not failure.
+- v1.8: Clarified GitHub auto deploy, added source logs for API versus fallback, and softened the waiting text animation.
 
 ## Thought
 
@@ -40,12 +42,12 @@ Japan Memory Lane is not a tourism guide, social feed, or AI tool interface. It 
 
 ## AI Generation Rules
 
-AI connection is implemented server-side through Cloudflare Pages Functions.　
+AI connection is implemented server-side through Cloudflare Pages Functions.
 
 - Writing rules are documented in `AI_GENERATION_RULES.md`.
 - API connection behavior is documented in `AI_CONNECTION_SPEC.md`.
 - Uploaded images are read from multipart form data, converted to a base64 data URL, and sent to OpenAI as an `input_image` from `functions/api/poem.js`.
-- Function logs include image type, image bytes, OpenAI status, output text head, poem lengths, and mood tags. API keys, full base64 strings, and image bodies must never be logged.
+- Function logs include image type, image bytes, OpenAI status, raw output head, poem lengths, mood tags, and `source` values for API/fallback tracing. API keys, full base64 strings, and image bodies must never be logged.
 
 Required Cloudflare environment variables:
 
@@ -58,16 +60,20 @@ Do not commit `.env` files or API keys to GitHub.
 
 Cloudflare Pages can serve this folder directly as a static site with Pages Functions.
 
-Use Cloudflare Pages deploy, not Workers deploy:
+Production deployment should normally happen through GitHub push auto deploy.
+
+Cloudflare Pages must have Git repository connection enabled for this to work. The connected repository should be the GitHub repository for this project, and pushes to the production branch should trigger Cloudflare Pages builds.
+
+Cloudflare Pages settings:
+
+- Build command: none
+- Build output directory: `/` or `.`
+- Functions directory: `functions/` at the project root
+
+Use manual deploy only when an immediate manual reflection is needed:
 
 ```bash
-npm run deploy
-```
-
-The deploy script runs:
-
-```bash
-wrangler pages deploy . --project-name japanmemorylane-site --branch main
+npx wrangler pages deploy . --project-name japanmemorylane-site --branch main
 ```
 
 Do not use `npx wrangler deploy` for this project. That command deploys a Worker and will not enable the `functions/api/poem.js` Pages Functions route.

@@ -233,13 +233,18 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
   const responseBody = JSON.parse(responseTextBody);
   const responseText = extractResponseText(responseBody);
 
-  console.log("OpenAI output text head", responseText.slice(0, 1000));
-  console.log("OpenAI raw output", responseText);
+  console.log("OpenAI raw output head", responseText.slice(0, 1000));
 
   const parsedPoem = JSON.parse(responseText);
 
-  console.log("Parsed Japanese poem", parsedPoem?.japanese_poem);
-  console.log("Parsed English poem", parsedPoem?.english_poem);
+  console.log("Parsed Japanese poem", {
+    source: "api",
+    japanese_poem: parsedPoem?.japanese_poem,
+  });
+  console.log("Parsed English poem", {
+    source: "api",
+    english_poem: parsedPoem?.english_poem,
+  });
 
   return validatePoem(parsedPoem);
 };
@@ -280,6 +285,7 @@ export async function onRequest({ request, env }) {
     });
 
     console.log("Poem JSON validated", {
+      source: "api",
       japaneseLength: poem.japanese_poem.length,
       englishLength: poem.english_poem.length,
       moodTags: poem.mood_tags,
@@ -288,6 +294,7 @@ export async function onRequest({ request, env }) {
     return json(poem);
   } catch (error) {
     console.error("Poem generation failed", {
+      source: "api_error",
       message: error?.message,
       stack: error?.stack,
     });
