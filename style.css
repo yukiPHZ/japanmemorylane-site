@@ -129,6 +129,7 @@ button {
 
 .jp-poem {
   align-self: center;
+  max-height: min(47vh, 13em);
   writing-mode: vertical-rl;
   text-orientation: mixed;
   color: var(--ink);
@@ -136,7 +137,8 @@ button {
     "Hiragino Mincho ProN", "Times New Roman", serif;
   font-size: 25px;
   font-weight: 400;
-  line-height: 2.05;
+  line-height: 1.94;
+  overflow-wrap: anywhere;
 }
 
 .en-poem {
@@ -217,19 +219,26 @@ body.js-ready .tanzaku.is-poem-waiting .en-poem {
 
 body.js-ready .tanzaku.is-poem-loading .jp-poem {
   opacity: 1;
+  visibility: visible;
   writing-mode: vertical-rl;
   text-orientation: mixed;
+  min-height: 6em;
+  min-width: 1em;
   transition: opacity 760ms ease;
 }
 
 body.js-ready .tanzaku.is-poem-loading .en-poem {
   opacity: 0.14;
+  visibility: visible;
   transition: opacity 760ms ease;
 }
 
 .loading-kana {
-  display: inline;
+  display: inline-block;
   opacity: 0.62;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  line-height: inherit;
   animation: quietLooking 5.2s ease-in-out infinite;
   animation-delay: var(--loading-delay, 0s);
 }
@@ -272,7 +281,7 @@ body.js-ready .tanzaku.is-poem-waiting.show-english-poem .en-poem {
 
   .jp-poem {
     font-size: 23px;
-    line-height: 1.92;
+    line-height: 1.88;
   }
 }
 
@@ -297,6 +306,10 @@ body.js-ready .tanzaku.is-poem-waiting.show-english-poem .en-poem {
 
   .en-poem {
     padding-top: 26px;
+  }
+
+  .jp-poem {
+    max-height: min(46vh, 12em);
   }
 
   .site-foot {

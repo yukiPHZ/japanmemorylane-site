@@ -1,6 +1,6 @@
-# Japan Memory Lane AI Generation Rules v1.5
+# Japan Memory Lane AI Generation Rules v2.2
 
-This document fixes the rules for image-aware poem generation.
+This document fixes the rules for image-aware poem generation and stable tanzaku display.
 
 The AI must not be the main experience. It should only help a selected photo become a quiet memory on a tanzaku.
 
@@ -14,7 +14,7 @@ The generated words should feel like a small trace placed beside the photo:
 - short
 - restrained
 - based on one visible detail
-- suitable for vertical Japanese writing
+- balanced for vertical tanzaku writing
 - supported by a small English interpretation
 
 This is not caption generation. The model should look at the photo, pick one small trace, and leave space.
@@ -25,9 +25,9 @@ The endpoint must return only JSON.
 
 ```json
 {
-  "japanese_poem": "しめ縄の下だけ\n風が\n遅かった",
-  "english_poem": "Under the sacred rope,\nthe wind seemed slower.",
-  "mood_tags": ["shrine", "wind", "quiet"]
+  "japanese_poem": "石の段に\n昨日の雨が\n残っていた",
+  "english_poem": "On the stone step,\nyesterday's rain stayed.",
+  "mood_tags": ["stone", "rain", "quiet"]
 }
 ```
 
@@ -36,7 +36,7 @@ Rules:
 - Return valid JSON only.
 - Do not wrap the response in Markdown.
 - Do not include explanations.
-- `japanese_poem` should contain 1 to 3 lines.
+- `japanese_poem` should contain 2 to 3 lines by default.
 - `english_poem` should contain 1 to 2 lines.
 - `mood_tags` should contain 1 to 5 short lowercase English tags.
 
@@ -62,25 +62,33 @@ The Japanese poem is the primary text.
 
 It should be:
 
-- 1 to 3 lines
+- 2 to 3 lines by default
+- 1 line only when the photo truly needs very few words
+- around 6 to 8 characters per line
 - short
 - natural
 - sparse
 - observational rather than explanatory
-- visually beautiful in vertical writing
+- visually balanced in vertical writing
 
 It should:
 
+- assume the poem will be displayed vertically as a tanzaku
+- keep visual balance in vertical writing
+- avoid overly long continuous phrases
+- avoid long connected patterns like `...の...の...`
 - pick one concrete thing
 - avoid turning the photo into a caption
 - reduce explicit subjects
+- prioritize empty space over readability
+- prefer atmosphere over explanation
 - avoid naming emotions too directly
 - avoid tourism language
 - avoid social-media language
 - avoid forced poetry
 - avoid dramatic or self-important phrasing
 - vary sentence shape
-- let punctuation appear only when natural
+- use punctuation only when it feels necessary
 
 Avoid overusing:
 
@@ -160,7 +168,14 @@ If the photo has no obvious Japan marker, use a visible detail instead of forcin
 
 Write a short Japanese poem first.
 The Japanese must be natural, quiet, and suitable for vertical writing.
-Use 1 to 3 short lines.
+The Japanese poem will be displayed vertically as a tanzaku.
+Keep visual balance in vertical writing.
+Prefer 2 or 3 balanced short columns.
+Use 2 to 3 short lines unless the image only needs one very small line.
+Keep each Japanese line around 6 to 8 characters.
+Avoid overly long continuous phrases.
+Avoid repeating connected の phrases such as の...の...の.
+Prioritize empty space over readability.
 Reduce explicit subjects.
 Pick one concrete thing, but do not turn it into a caption.
 Do not explain the photo.
@@ -184,30 +199,16 @@ Do not make the English a full caption.
 Return only JSON.
 ```
 
-## Test Themes
-
-Use these themes before accepting the image-aware behavior:
-
-- 雨の窓
-- 遠い電車
-- 小さな神社
-- 夜の路地
-- 自販機の光
-- 住宅街の夕方
-- 誰もいない道
-- 夏の影
-- 冬の朝
-- 古い看板
-
 ## Review Checklist
 
 Before accepting generated output, check:
 
 - The uploaded image is sent as an `input_image`.
 - The Japanese picks one visible detail from the photo.
-- The Japanese looks good in vertical writing.
+- The Japanese usually fits into 2 to 3 vertical columns.
+- Each Japanese line is usually around 6 to 8 characters.
+- The Japanese leaves visible space around it.
 - The English does not compete with the Japanese.
 - The output is not a photo description.
 - The output is not tourism copy.
 - The output does not feel like an AI caption.
-- The words leave space around the photo.

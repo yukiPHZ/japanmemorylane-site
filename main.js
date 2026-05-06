@@ -142,7 +142,34 @@ const renderPoemLines = (element, lines) => {
 
 const chooseQuietPoem = () => fallbackPoem;
 
+const getLoadingKanaCount = () => {
+  if (!firstMemoryJapanesePoem) {
+    return 0;
+  }
+
+  if (typeof firstMemoryJapanesePoem.querySelectorAll === "function") {
+    return firstMemoryJapanesePoem.querySelectorAll(".loading-kana").length;
+  }
+
+  return Array.from(firstMemoryJapanesePoem.children || []).filter(
+    (child) => child.className === "loading-kana",
+  ).length;
+};
+
+const getElementMarkup = (element) =>
+  typeof element?.innerHTML === "string" ? element.innerHTML : element?.textContent;
+
 const renderLoadingJapanesePoem = () => {
+  console.log("loading poem render start", {
+    japanese: loadingPoem.japanese[0],
+    english: loadingPoem.english[0],
+  });
+  console.log("loading poem element found", {
+    japanese: Boolean(firstMemoryJapanesePoem),
+    english: Boolean(firstMemoryEnglishPoem),
+    tanzaku: Boolean(firstTanzaku),
+  });
+
   if (!firstMemoryJapanesePoem) {
     return;
   }
@@ -154,6 +181,13 @@ const renderLoadingJapanesePoem = () => {
     characterElement.style.setProperty("--loading-delay", `${index * 0.46}s`);
     characterElement.append(document.createTextNode(character));
     firstMemoryJapanesePoem.append(characterElement);
+  });
+
+  console.log("loading poem html", {
+    japanese: getElementMarkup(firstMemoryJapanesePoem),
+  });
+  console.log("loading kana count", {
+    count: getLoadingKanaCount(),
   });
 };
 
@@ -250,6 +284,18 @@ const clearPoemRevealTimers = () => {
   window.clearTimeout(englishPoemTimer);
 };
 
+const waitForLoadingPaint = () =>
+  new Promise((resolve) => {
+    if (typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(() => {
+        window.setTimeout(resolve, 24);
+      });
+      return;
+    }
+
+    window.setTimeout(resolve, 32);
+  });
+
 const setPoemsWaiting = () => {
   if (!firstTanzaku) {
     return;
@@ -258,6 +304,13 @@ const setPoemsWaiting = () => {
   showLoadingPoem();
   firstTanzaku.classList.add("is-poem-waiting", "is-poem-loading");
   firstTanzaku.classList.remove("show-japanese-poem", "show-english-poem");
+
+  console.log("loading class applied", {
+    isPoemWaiting: firstTanzaku.classList.contains("is-poem-waiting"),
+    isPoemLoading: firstTanzaku.classList.contains("is-poem-loading"),
+    japaneseText: firstMemoryJapanesePoem?.textContent || "",
+    englishText: firstMemoryEnglishPoem?.textContent || "",
+  });
 };
 
 const revealFirstMemoryPoems = () => {
@@ -296,6 +349,16 @@ const replaceFirstMemoryPoemsAfterPause = (poem, source = "api") => {
 
 const replaceFirstMemoryPoemsFromApi = async (file, requestId) => {
   try {
+    await waitForLoadingPaint();
+
+    if (requestId !== poemRequestId) {
+      console.log("Japan Memory Lane skipped stale poem request", {
+        requestId,
+        currentRequestId: poemRequestId,
+      });
+      return;
+    }
+
     const poem = await requestPoem(file);
 
     if (requestId !== poemRequestId) {

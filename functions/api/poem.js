@@ -2,6 +2,9 @@ const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_MODEL = "gpt-4o-mini";
 const IMAGE_DETAIL = "high";
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const JAPANESE_LINE_MAX = 8;
+const JAPANESE_LINE_SOFT_MAX = 7;
+const JAPANESE_LINE_MIN = 4;
 const ALLOWED_IMAGE_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -50,7 +53,14 @@ If the photo has no obvious Japan marker, use a visible detail instead of forcin
 
 Write a short Japanese poem first.
 The Japanese must be natural, quiet, and suitable for vertical writing.
-Use 1 to 3 short lines.
+The Japanese poem will be displayed vertically as a tanzaku.
+Keep visual balance in vertical writing.
+Prefer 2 or 3 balanced short columns.
+Use 2 to 3 short lines unless the image only needs one very small line.
+Keep each Japanese line around 6 to 8 characters.
+Avoid overly long continuous phrases.
+Avoid repeating connected の phrases such as の...の...の.
+Prioritize empty space over readability.
 Reduce explicit subjects.
 Pick one concrete thing, but do not turn it into a caption.
 Do not explain the photo.
@@ -170,8 +180,84 @@ const extractResponseText = (responseBody) => {
   );
 };
 
+const visibleLength = (text) => [...text].length;
+
+const findJapaneseBreakIndex = (line) => {
+  const characters = [...line];
+  const maxIndex = Math.min(JAPANESE_LINE_MAX, characters.length - 1);
+  const preferredBreakAfter = new Set([
+    "に",
+    "を",
+    "が",
+    "は",
+    "で",
+    "と",
+    "へ",
+    "も",
+    "や",
+    "、",
+  ]);
+
+  for (let index = maxIndex; index >= JAPANESE_LINE_MIN; index -= 1) {
+    if (preferredBreakAfter.has(characters[index - 1])) {
+      return index;
+    }
+  }
+
+  for (let index = JAPANESE_LINE_SOFT_MAX; index >= JAPANESE_LINE_MIN; index -= 1) {
+    if (characters[index] === "の") {
+      return index;
+    }
+  }
+
+  return Math.min(JAPANESE_LINE_SOFT_MAX, characters.length - 1);
+};
+
+const splitLongJapaneseLine = (line) => {
+  const segments = [];
+  let remaining = line.trim();
+
+  while (visibleLength(remaining) > JAPANESE_LINE_MAX && segments.length < 2) {
+    const breakIndex = findJapaneseBreakIndex(remaining);
+    const characters = [...remaining];
+    segments.push(characters.slice(0, breakIndex).join("").trim());
+    remaining = characters.slice(breakIndex).join("").trim();
+  }
+
+  if (remaining) {
+    segments.push(remaining);
+  }
+
+  return segments.filter(Boolean);
+};
+
+const balanceJapanesePoem = (poem) => {
+  const originalLines = String(poem || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const balancedLines = originalLines.flatMap((line) =>
+    visibleLength(line) > JAPANESE_LINE_MAX
+      ? splitLongJapaneseLine(line)
+      : line,
+  );
+
+  while (balancedLines.length > 3) {
+    const tail = balancedLines.pop();
+    balancedLines[balancedLines.length - 1] = `${balancedLines[
+      balancedLines.length - 1
+    ]}${tail}`;
+  }
+
+  return balancedLines.slice(0, 3).join("\n");
+};
+
 const validatePoem = (poem) => {
-  const japanesePoem = poem?.japanese_poem;
+  const japanesePoem =
+    typeof poem?.japanese_poem === "string"
+      ? balanceJapanesePoem(poem.japanese_poem)
+      : poem?.japanese_poem;
   const englishPoem = poem?.english_poem;
   const moodTags = Array.isArray(poem?.mood_tags)
     ? poem.mood_tags
