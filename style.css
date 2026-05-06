@@ -215,6 +215,16 @@ body.js-ready .tanzaku.is-poem-waiting .en-poem {
   transition: none;
 }
 
+body.js-ready .tanzaku.is-poem-loading .jp-poem {
+  opacity: 0.54;
+  transition: opacity 760ms ease;
+}
+
+body.js-ready .tanzaku.is-poem-loading .en-poem {
+  opacity: 0.26;
+  transition: opacity 760ms ease;
+}
+
 body.js-ready .tanzaku.is-poem-waiting.show-japanese-poem .jp-poem,
 body.js-ready .tanzaku.is-poem-waiting.show-english-poem .en-poem {
   opacity: 1;

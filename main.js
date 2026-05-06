@@ -14,6 +14,10 @@ const fallbackPoem = {
   japanese: ["……"],
   english: ["……"],
 };
+const loadingPoem = {
+  japanese: ["見ている"],
+  english: ["looking quietly..."],
+};
 let settleTimer;
 let japanesePoemTimer;
 let englishPoemTimer;
@@ -138,6 +142,11 @@ const renderPoemLines = (element, lines) => {
 
 const chooseQuietPoem = () => fallbackPoem;
 
+const showLoadingPoem = () => {
+  renderPoemLines(firstMemoryJapanesePoem, loadingPoem.japanese);
+  renderPoemLines(firstMemoryEnglishPoem, loadingPoem.english);
+};
+
 const splitPoemLines = (poem) =>
   String(poem || "")
     .split(/\r?\n/)
@@ -198,7 +207,8 @@ const setPoemsWaiting = () => {
     return;
   }
 
-  firstTanzaku.classList.add("is-poem-waiting");
+  showLoadingPoem();
+  firstTanzaku.classList.add("is-poem-waiting", "is-poem-loading");
   firstTanzaku.classList.remove("show-japanese-poem", "show-english-poem");
 };
 
@@ -218,6 +228,10 @@ const revealFirstMemoryPoems = () => {
 
 const replaceFirstMemoryPoemsAfterPause = (poem) => {
   const nextPoem = normalizePoem(poem) || chooseQuietPoem();
+
+  if (firstTanzaku) {
+    firstTanzaku.classList.remove("is-poem-loading");
+  }
 
   console.log("Japan Memory Lane frontend render text", {
     japanese: nextPoem.japanese.join("\n"),
