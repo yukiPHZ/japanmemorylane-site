@@ -217,17 +217,20 @@ body.js-ready .tanzaku.is-poem-waiting .en-poem {
 
 body.js-ready .tanzaku.is-poem-loading .jp-poem {
   opacity: 1;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
   transition: opacity 760ms ease;
 }
 
 body.js-ready .tanzaku.is-poem-loading .en-poem {
-  opacity: 0.18;
+  opacity: 0.14;
   transition: opacity 760ms ease;
 }
 
 .loading-kana {
-  display: inline-block;
-  animation: quietLooking 3.2s ease-in-out infinite;
+  display: inline;
+  opacity: 0.62;
+  animation: quietLooking 5.2s ease-in-out infinite;
   animation-delay: var(--loading-delay, 0s);
 }
 
@@ -321,7 +324,7 @@ body.js-ready .tanzaku.is-poem-waiting.show-english-poem .en-poem {
 
   .loading-kana {
     animation: none;
-    opacity: 0.64;
+    opacity: 0.62;
   }
 }
 
@@ -334,10 +337,10 @@ body.js-ready .tanzaku.is-poem-waiting.show-english-poem .en-poem {
 @keyframes quietLooking {
   0%,
   100% {
-    opacity: 0.35;
+    opacity: 0.45;
   }
 
-  48% {
-    opacity: 0.9;
+  52% {
+    opacity: 0.85;
   }
 }

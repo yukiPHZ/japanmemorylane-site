@@ -15,8 +15,8 @@ const fallbackPoem = {
   english: ["……"],
 };
 const loadingPoem = {
-  japanese: ["見ている"],
-  english: ["looking quietly..."],
+  japanese: ["ことばの前"],
+  english: ["before words"],
 };
 let settleTimer;
 let japanesePoemTimer;
@@ -151,7 +151,7 @@ const renderLoadingJapanesePoem = () => {
   [...loadingPoem.japanese[0]].forEach((character, index) => {
     const characterElement = document.createElement("span");
     characterElement.className = "loading-kana";
-    characterElement.style.setProperty("--loading-delay", `${index * 0.38}s`);
+    characterElement.style.setProperty("--loading-delay", `${index * 0.46}s`);
     characterElement.append(document.createTextNode(character));
     firstMemoryJapanesePoem.append(characterElement);
   });
