@@ -86,6 +86,16 @@ const json = (body, init = {}) =>
     },
   });
 
+class PoemApiError extends Error {
+  constructor(stage, message, options = {}) {
+    super(message);
+    this.name = "PoemApiError";
+    this.stage = stage;
+    this.responseStatus = options.responseStatus || 500;
+    this.diagnosticStatus = options.diagnosticStatus || this.responseStatus;
+  }
+}
+
 const methodNotAllowed = () =>
   json(
     { error: "method_not_allowed" },
@@ -101,6 +111,31 @@ const isImageFile = (file) =>
   file &&
   typeof file.arrayBuffer === "function" &&
   ALLOWED_IMAGE_TYPES.has(file.type);
+
+const poemError = (stage, message, options) =>
+  new PoemApiError(stage, message, options);
+
+const errorResponse = (error) => {
+  const stage = error instanceof PoemApiError ? error.stage : "unknown";
+  const status =
+    error instanceof PoemApiError ? error.diagnosticStatus : 500;
+  const responseStatus =
+    error instanceof PoemApiError ? error.responseStatus : 500;
+  const message =
+    error instanceof PoemApiError
+      ? error.message
+      : "Unexpected poem generation failure";
+
+  return json(
+    {
+      error: "poem_generation_failed",
+      stage,
+      status,
+      message,
+    },
+    { status: responseStatus },
+  );
+};
 
 const toBase64 = (arrayBuffer) => {
   const bytes = new Uint8Array(arrayBuffer);
@@ -129,7 +164,10 @@ const extractResponseText = (responseBody) => {
     }
   }
 
-  return "";
+  throw poemError(
+    "openai_response_parse",
+    "OpenAI response did not include output text",
+  );
 };
 
 const validatePoem = (poem) => {
@@ -151,7 +189,10 @@ const validatePoem = (poem) => {
     moodTags.length > 5 ||
     !moodTags.every((tag) => typeof tag === "string")
   ) {
-    throw new Error("Invalid poem JSON");
+    throw poemError(
+      "schema_validation",
+      "OpenAI poem JSON did not match the expected schema",
+    );
   }
 
   return {
@@ -165,11 +206,17 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
   const arrayBuffer = await file.arrayBuffer();
 
   if (arrayBuffer.byteLength > MAX_IMAGE_BYTES) {
-    throw new Error("Image too large");
+    throw poemError("invalid_image", "Image is too large", {
+      responseStatus: 400,
+      diagnosticStatus: 400,
+    });
   }
 
   if (arrayBuffer.byteLength === 0) {
-    throw new Error("Image is empty");
+    throw poemError("invalid_image", "Image is empty", {
+      responseStatus: 400,
+      diagnosticStatus: 400,
+    });
   }
 
   console.log("Japan Memory Lane poem request", {
@@ -180,41 +227,51 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
   });
 
   const imageUrl = `data:${file.type};base64,${toBase64(arrayBuffer)}`;
-  const response = await fetch(OPENAI_RESPONSES_URL, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      input: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: generationPrompt,
-            },
-            {
-              type: "input_image",
-              image_url: imageUrl,
-              detail: IMAGE_DETAIL,
-            },
-          ],
-        },
-      ],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "japan_memory_lane_poem",
-          schema: poemSchema,
-          strict: true,
-        },
+  let response;
+
+  try {
+    response = await fetch(OPENAI_RESPONSES_URL, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json",
       },
-      store: false,
-    }),
-  });
+      body: JSON.stringify({
+        model,
+        input: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "input_text",
+                text: generationPrompt,
+              },
+              {
+                type: "input_image",
+                image_url: imageUrl,
+                detail: IMAGE_DETAIL,
+              },
+            ],
+          },
+        ],
+        text: {
+          format: {
+            type: "json_schema",
+            name: "japan_memory_lane_poem",
+            schema: poemSchema,
+            strict: true,
+          },
+        },
+        store: false,
+      }),
+    });
+  } catch (error) {
+    console.error("OpenAI request network error", {
+      message: error?.message,
+    });
+    throw poemError("openai_request", "OpenAI API request failed");
+  }
+
   const responseTextBody = await response.text();
 
   console.log("OpenAI API response status", {
@@ -225,17 +282,46 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
   if (!response.ok) {
     console.error("OpenAI API error response", {
       status: response.status,
-      body: responseTextBody.slice(0, 2000),
+      bodyHead: responseTextBody.slice(0, 1000),
     });
-    throw new Error(`OpenAI request failed with ${response.status}`);
+    throw poemError("openai_request", "OpenAI API request failed", {
+      diagnosticStatus: response.status,
+    });
   }
 
-  const responseBody = JSON.parse(responseTextBody);
+  let responseBody;
+
+  try {
+    responseBody = JSON.parse(responseTextBody);
+  } catch (error) {
+    console.error("OpenAI response JSON parse failed", {
+      message: error?.message,
+      bodyHead: responseTextBody.slice(0, 1000),
+    });
+    throw poemError(
+      "openai_response_parse",
+      "OpenAI API response was not valid JSON",
+    );
+  }
+
   const responseText = extractResponseText(responseBody);
 
   console.log("OpenAI raw output head", responseText.slice(0, 1000));
 
-  const parsedPoem = JSON.parse(responseText);
+  let parsedPoem;
+
+  try {
+    parsedPoem = JSON.parse(responseText);
+  } catch (error) {
+    console.error("OpenAI output JSON parse failed", {
+      message: error?.message,
+      outputHead: responseText.slice(0, 1000),
+    });
+    throw poemError(
+      "openai_response_parse",
+      "OpenAI output text was not valid poem JSON",
+    );
+  }
 
   console.log("Parsed Japanese poem", {
     source: "api",
@@ -258,7 +344,10 @@ export async function onRequest({ request, env }) {
     const contentType = request.headers.get("content-type") || "";
 
     if (!contentType.toLowerCase().includes("multipart/form-data")) {
-      return json({ error: "multipart_form_data_required" }, { status: 400 });
+      throw poemError("invalid_image", "Multipart image upload is required", {
+        responseStatus: 400,
+        diagnosticStatus: 400,
+      });
     }
 
     const formData = await request.formData();
@@ -268,14 +357,20 @@ export async function onRequest({ request, env }) {
       console.error("Poem image was missing or unsupported", {
         imageType: image?.type || null,
       });
-      return json({ error: "unsupported_image" }, { status: 400 });
+      throw poemError("invalid_image", "A supported image file is required", {
+        responseStatus: 400,
+        diagnosticStatus: 400,
+      });
     }
 
     const apiKey = env?.OPENAI_API_KEY;
 
     if (!apiKey) {
       console.error("OPENAI_API_KEY is not configured");
-      throw new Error("OPENAI_API_KEY is not configured");
+      throw poemError(
+        "missing_api_key",
+        "OpenAI API key is not configured",
+      );
     }
 
     const poem = await requestOpenAIPoem({
@@ -295,9 +390,11 @@ export async function onRequest({ request, env }) {
   } catch (error) {
     console.error("Poem generation failed", {
       source: "api_error",
+      stage: error?.stage || "unknown",
+      status: error?.diagnosticStatus || 500,
       message: error?.message,
       stack: error?.stack,
     });
-    return json({ error: "poem_generation_failed" }, { status: 500 });
+    return errorResponse(error);
   }
 }

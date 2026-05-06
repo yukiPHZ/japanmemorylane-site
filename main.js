@@ -192,6 +192,19 @@ const normalizePoem = (poem) => {
   };
 };
 
+const readPoemErrorJson = async (response) => {
+  try {
+    return await response.json();
+  } catch {
+    return {
+      error: "poem_request_failed",
+      stage: "unknown",
+      status: response.status,
+      message: "Poem request failed without JSON body",
+    };
+  }
+};
+
 const requestPoem = async (file) => {
   const formData = new FormData();
   formData.append("image", file);
@@ -208,7 +221,12 @@ const requestPoem = async (file) => {
   });
 
   if (!response.ok) {
-    throw new Error(`Poem request failed with ${response.status}`);
+    const errorJson = await readPoemErrorJson(response);
+    console.error("Poem request failed", errorJson);
+
+    const error = new Error(`Poem request failed with ${response.status}`);
+    error.detail = errorJson;
+    throw error;
   }
 
   const responseJson = await response.json();
@@ -293,6 +311,7 @@ const replaceFirstMemoryPoemsFromApi = async (file, requestId) => {
     console.error("Japan Memory Lane poem request failed; using fallback", {
       source: "fallback",
       message: error?.message,
+      detail: error?.detail || null,
     });
 
     if (requestId !== poemRequestId) {

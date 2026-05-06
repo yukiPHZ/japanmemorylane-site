@@ -35,6 +35,7 @@ It is intended for temporary deployment on Cloudflare Pages.
 - v1.6: Removed the old fixed fallback poem and added trace logs for API output, parsed poems, frontend JSON, and rendered text.
 - v1.7: Split the loading poem from fallback so the waiting state reads as quiet space, not failure.
 - v1.8: Clarified GitHub auto deploy, added source logs for API versus fallback, and softened the waiting text animation.
+- v1.9: Added safe API error diagnostics and `/api/health` for production troubleshooting without exposing secrets.
 
 ## Thought
 
@@ -48,6 +49,8 @@ AI connection is implemented server-side through Cloudflare Pages Functions.
 - API connection behavior is documented in `AI_CONNECTION_SPEC.md`.
 - Uploaded images are read from multipart form data, converted to a base64 data URL, and sent to OpenAI as an `input_image` from `functions/api/poem.js`.
 - Function logs include image type, image bytes, OpenAI status, raw output head, poem lengths, mood tags, and `source` values for API/fallback tracing. API keys, full base64 strings, and image bodies must never be logged.
+- `/api/poem` error responses include safe diagnostic fields: `stage`, `status`, and `message`.
+- `/api/health` returns `{ "ok": true, "hasOpenAiKey": true }` or `{ "ok": true, "hasOpenAiKey": false }`. It never returns the key value.
 
 Required Cloudflare environment variables:
 
@@ -86,4 +89,5 @@ Expected public files:
 - `favicon.svg`
 - `assets/`
 - `functions/api/poem.js`
+- `functions/api/health.js`
 - `_routes.json`
