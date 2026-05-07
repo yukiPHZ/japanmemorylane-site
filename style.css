@@ -196,6 +196,31 @@ button {
   pointer-events: none;
 }
 
+.keep-link {
+  position: fixed;
+  left: max(18px, calc((100vw - 430px) / 2 + 18px));
+  bottom: max(18px, calc((100vh - var(--lane-height)) / 2 + 18px));
+  z-index: 3;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid rgba(31, 31, 31, 0.1);
+  background: transparent;
+  color: rgba(31, 31, 31, 0.32);
+  cursor: default;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.keep-link:focus-visible {
+  outline: 1px solid rgba(31, 31, 31, 0.32);
+  outline-offset: 5px;
+}
+
+.keep-link.is-saving {
+  color: rgba(31, 31, 31, 0.18);
+}
+
 body.js-ready .jp-poem,
 body.js-ready .en-poem {
   opacity: 0;
