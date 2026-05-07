@@ -24,6 +24,10 @@ let englishPoemTimer;
 let selectedPhotoUrl;
 let poemRequestId = 0;
 
+const emitTanzakuEvent = (name, detail = {}) => {
+  window.dispatchEvent(new CustomEvent(name, { detail }));
+};
+
 const setScreenHeight = () => {
   document.documentElement.style.setProperty(
     "--screen-height",
@@ -304,6 +308,7 @@ const setPoemsWaiting = () => {
   showLoadingPoem();
   firstTanzaku.classList.add("is-poem-waiting", "is-poem-loading");
   firstTanzaku.classList.remove("show-japanese-poem", "show-english-poem");
+  emitTanzakuEvent("jml:tanzaku-pending", { requestId: poemRequestId });
 
   console.log("loading class applied", {
     isPoemWaiting: firstTanzaku.classList.contains("is-poem-waiting"),
@@ -345,6 +350,10 @@ const replaceFirstMemoryPoemsAfterPause = (poem, source = "api") => {
   renderPoemLines(firstMemoryJapanesePoem, nextPoem.japanese);
   renderPoemLines(firstMemoryEnglishPoem, nextPoem.english);
   revealFirstMemoryPoems();
+  emitTanzakuEvent("jml:tanzaku-ready", {
+    source: renderSource,
+    requestId: poemRequestId,
+  });
 };
 
 const replaceFirstMemoryPoemsFromApi = async (file, requestId) => {
