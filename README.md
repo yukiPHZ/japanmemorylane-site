@@ -47,14 +47,14 @@ AI connection is implemented server-side through Cloudflare Pages Functions.
 
 - Writing rules are documented in `AI_GENERATION_RULES.md`.
 - API connection behavior is documented in `AI_CONNECTION_SPEC.md`.
-- Uploaded images are read from multipart form data, converted to a base64 data URL, and sent to OpenAI as an `input_image` from `functions/api/poem.js`.
+- Uploaded images are read from multipart form data, converted to a base64 data URL, and sent to OpenAI as an `input_image` from `functions/api/poem.js` and `functions/api/journey.js`.
 - Function logs include image type, image bytes, OpenAI status, raw output head, poem lengths, mood tags, and `source` values for API/fallback tracing. API keys, full base64 strings, and image bodies must never be logged.
 - `/api/poem` error responses include safe diagnostic fields: `stage`, `status`, and `message`.
 - `/api/health` returns `{ "ok": true, "hasOpenAiKey": true }` or `{ "ok": true, "hasOpenAiKey": false }`. It never returns the key value.
 
 Required Cloudflare environment variables:
 
-- `OPENAI_API_KEY`: OpenAI API key used only by `functions/api/poem.js`.
+- `OPENAI_API_KEY`: OpenAI API key used only by Cloudflare Pages Functions such as `functions/api/poem.js` and `functions/api/journey.js`.
 - `OPENAI_MODEL`: Optional model override. Defaults to `gpt-4o-mini`.
 
 Do not commit `.env` files or API keys to GitHub.

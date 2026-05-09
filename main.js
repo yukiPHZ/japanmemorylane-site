@@ -19,17 +19,23 @@ const beforeWords = {
   japanese: ["ことばの前"],
   english: ["before words"],
 };
+const fallbackPoem = {
+  japanese: ["……"],
+  english: ["……"],
+  source: "fallback",
+};
 
 const journeyState = {
   acceptedFiles: [],
   currentIndex: 0,
   gate: "idle",
+  poems: [],
   ready: false,
+  requestId: 0,
 };
 
 let settleTimer;
 let journeyBeforeWordsTimer;
-let journeyEnterApplyTimer;
 let selectedJourneyPhotoUrls = [];
 
 const setScreenHeight = () => {
@@ -62,6 +68,45 @@ const renderGateText = ({ japanese, english }) => {
   if (journeyGateEnglish) {
     renderPoemLines(journeyGateEnglish, String(english).split("\n"));
   }
+};
+
+const splitPoemLines = (poem) =>
+  String(poem || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+const normalizeJourneyPoem = (poem) => {
+  const japanese = Array.isArray(poem?.japanese)
+    ? poem.japanese
+    : splitPoemLines(poem?.japanese_poem);
+  const english = Array.isArray(poem?.english)
+    ? poem.english
+    : splitPoemLines(poem?.english_poem);
+
+  if (japanese.length === 0 || english.length === 0) {
+    return null;
+  }
+
+  return {
+    japanese: japanese.slice(0, 3),
+    english: english.slice(0, 2),
+    source: poem?.mood_tags?.includes("fallback") ? "fallback" : "api",
+  };
+};
+
+const createFallbackJourneyPoems = () =>
+  Array.from({ length: journeyLimit }, () => ({ ...fallbackPoem }));
+
+const normalizeJourneyResponse = (responseJson) => {
+  const journey = Array.isArray(responseJson?.journey)
+    ? responseJson.journey
+    : [];
+
+  return Array.from({ length: journeyLimit }, (_, index) => {
+    const poem = normalizeJourneyPoem(journey[index]);
+    return poem || { ...fallbackPoem };
+  });
 };
 
 const findClosestTanzaku = () => {
@@ -154,6 +199,66 @@ const setJourneyCount = (count) => {
   }
 };
 
+const readJourneyErrorJson = async (response) => {
+  try {
+    return await response.json();
+  } catch {
+    return {
+      error: "journey_request_failed",
+      status: response.status,
+    };
+  }
+};
+
+const requestJourneyPoems = async (files, requestId) => {
+  const journeyFiles = files.slice(0, journeyLimit);
+  const formData = new FormData();
+
+  journeyFiles.forEach((file, index) => {
+    formData.append("images", file);
+    console.log(`generating poem: ${index + 1}/${journeyLimit}`);
+  });
+
+  console.log("journey request started", {
+    requestId,
+    acceptedFiles: journeyFiles.length,
+  });
+
+  const response = await fetch("/api/journey", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorJson = await readJourneyErrorJson(response);
+    console.error("journey request failed", errorJson);
+    throw new Error(`Journey request failed with ${response.status}`);
+  }
+
+  const responseJson = await response.json();
+
+  console.log("journey response received", {
+    requestId,
+    count: Array.isArray(responseJson?.journey)
+      ? responseJson.journey.length
+      : 0,
+  });
+
+  return normalizeJourneyResponse(responseJson);
+};
+
+const waitForBeforeWordsPaint = () =>
+  new Promise((resolve) => {
+    if (typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(() => {
+        window.setTimeout(resolve, 420);
+      });
+      return;
+    }
+
+    window.setTimeout(resolve, 520);
+  });
+
 const setGateIntro = () => {
   journeyGate?.classList.remove("is-before-words");
   renderGateText(journeyIntro);
@@ -219,8 +324,9 @@ const resetTanzakuReveal = () => {
   });
 };
 
-const createJourneyCards = () => {
+const createJourneyCards = (poems = journeyState.poems) => {
   const journeyItems = journeyState.acceptedFiles.slice(0, journeyLimit);
+  const journeyPoems = poems.length > 0 ? poems : createFallbackJourneyPoems();
 
   clearJourneyPhotoUrls();
   resetTanzakuReveal();
@@ -241,8 +347,17 @@ const createJourneyCards = () => {
     image.alt = `A quiet moment ${index + 1} selected for Japan Memory Lane`;
     image.loading = index === 0 ? "eager" : "lazy";
 
-    renderPoemLines(japanesePoem, beforeWords.japanese);
-    renderPoemLines(englishPoem, beforeWords.english);
+    const poem = journeyPoems[index] || fallbackPoem;
+
+    renderPoemLines(japanesePoem, poem.japanese);
+    renderPoemLines(englishPoem, poem.english);
+
+    console.log("card poem applied", {
+      index: index + 1,
+      source: poem.source || "api",
+      japanese: poem.japanese.join("\n"),
+      english: poem.english.join("\n"),
+    });
   });
 
   journeyState.ready = true;
@@ -266,11 +381,48 @@ const enterJourneyWhenReady = () => {
     return;
   }
 
-  window.clearTimeout(journeyBeforeWordsTimer);
-  window.clearTimeout(journeyEnterApplyTimer);
+  if (
+    journeyState.gate === "preparing" ||
+    journeyState.gate === "before-words"
+  ) {
+    return;
+  }
 
-  journeyBeforeWordsTimer = window.setTimeout(showBeforeWordsGate, 260);
-  journeyEnterApplyTimer = window.setTimeout(createJourneyCards, 1260);
+  const requestId = journeyState.requestId + 1;
+  journeyState.requestId = requestId;
+  journeyState.gate = "preparing";
+
+  window.clearTimeout(journeyBeforeWordsTimer);
+
+  journeyBeforeWordsTimer = window.setTimeout(async () => {
+    showBeforeWordsGate();
+
+    try {
+      await waitForBeforeWordsPaint();
+      const poems = await requestJourneyPoems(
+        journeyState.acceptedFiles,
+        requestId,
+      );
+
+      if (requestId !== journeyState.requestId) {
+        return;
+      }
+
+      journeyState.poems = poems;
+    } catch (error) {
+      console.error("journey request failed; using fallback poems", {
+        message: error?.message,
+      });
+
+      if (requestId !== journeyState.requestId) {
+        return;
+      }
+
+      journeyState.poems = createFallbackJourneyPoems();
+    }
+
+    createJourneyCards(journeyState.poems);
+  }, 260);
 };
 
 const acceptSelectedFiles = (selectedFiles) => {
@@ -362,6 +514,5 @@ quietMomentInput?.addEventListener("change", () => {
 window.addEventListener("beforeunload", () => {
   window.clearTimeout(settleTimer);
   window.clearTimeout(journeyBeforeWordsTimer);
-  window.clearTimeout(journeyEnterApplyTimer);
   clearJourneyPhotoUrls();
 });
