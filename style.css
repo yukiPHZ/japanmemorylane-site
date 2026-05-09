@@ -346,6 +346,12 @@ body.js-ready .tanzaku.has-been-seen .en-poem {
   transition-delay: 90ms;
 }
 
+body.js-ready .tanzaku.has-been-seen.is-poem-updating .jp-poem,
+body.js-ready .tanzaku.has-been-seen.is-poem-updating .en-poem {
+  opacity: 0.3;
+  transition: opacity 360ms ease;
+}
+
 body.js-ready .tanzaku.is-poem-waiting .jp-poem,
 body.js-ready .tanzaku.is-poem-waiting .en-poem {
   opacity: 0;

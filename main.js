@@ -36,6 +36,7 @@ const journeyState = {
 
 let settleTimer;
 let journeyBeforeWordsTimer;
+let poemUpdateTimers = [];
 let selectedJourneyPhotoUrls = [];
 
 const setScreenHeight = () => {
@@ -97,6 +98,13 @@ const normalizeJourneyPoem = (poem) => {
 
 const createFallbackJourneyPoems = () =>
   Array.from({ length: journeyLimit }, () => ({ ...fallbackPoem }));
+
+const createBeforeWordsJourneyPoems = () =>
+  Array.from({ length: journeyLimit }, () => ({
+    japanese: [...beforeWords.japanese],
+    english: [...beforeWords.english],
+    source: "before-words",
+  }));
 
 const normalizeJourneyResponse = (responseJson) => {
   const journey = Array.isArray(responseJson?.journey)
@@ -311,6 +319,11 @@ const clearJourneyPhotoUrls = () => {
   selectedJourneyPhotoUrls = [];
 };
 
+const clearPoemUpdateTimers = () => {
+  poemUpdateTimers.forEach((timer) => window.clearTimeout(timer));
+  poemUpdateTimers = [];
+};
+
 const resetTanzakuReveal = () => {
   tanzakuItems.forEach((item) => {
     item.classList.remove(
@@ -318,16 +331,47 @@ const resetTanzakuReveal = () => {
       "is-current",
       "is-poem-waiting",
       "is-poem-loading",
+      "is-poem-updating",
       "show-japanese-poem",
       "show-english-poem",
     );
   });
 };
 
+const updateJourneyCardPoem = (index, poem) => {
+  const item = tanzakuItems[index];
+  const japanesePoem = item?.querySelector(".jp-poem");
+  const englishPoem = item?.querySelector(".en-poem");
+  const nextPoem = poem || fallbackPoem;
+
+  if (!item || !japanesePoem || !englishPoem) {
+    return;
+  }
+
+  item.classList.add("is-poem-updating");
+
+  const timer = window.setTimeout(() => {
+    renderPoemLines(japanesePoem, nextPoem.japanese);
+    renderPoemLines(englishPoem, nextPoem.english);
+    item.classList.remove("is-poem-updating");
+
+    console.log("card poem updated", {
+      index: index + 1,
+      source: nextPoem.source || "api",
+      japanese: nextPoem.japanese.join("\n"),
+      english: nextPoem.english.join("\n"),
+    });
+  }, 360);
+
+  poemUpdateTimers.push(timer);
+};
+
 const createJourneyCards = (poems = journeyState.poems) => {
   const journeyItems = journeyState.acceptedFiles.slice(0, journeyLimit);
-  const journeyPoems = poems.length > 0 ? poems : createFallbackJourneyPoems();
+  const journeyPoems =
+    poems.length > 0 ? poems : createBeforeWordsJourneyPoems();
 
+  clearPoemUpdateTimers();
   clearJourneyPhotoUrls();
   resetTanzakuReveal();
 
@@ -374,6 +418,41 @@ const createJourneyCards = (poems = journeyState.poems) => {
   console.log("journey cards created", {
     count: journeyItems.length,
   });
+
+  console.log("journey cards shown before api", {
+    count: journeyItems.length,
+  });
+};
+
+const startJourneyPoemRequest = async (requestId) => {
+  try {
+    const poems = await requestJourneyPoems(
+      journeyState.acceptedFiles,
+      requestId,
+    );
+
+    if (requestId !== journeyState.requestId) {
+      return;
+    }
+
+    journeyState.poems = poems;
+    poems.forEach((poem, index) => {
+      updateJourneyCardPoem(index, poem);
+    });
+  } catch (error) {
+    console.error("journey request failed", {
+      message: error?.message,
+    });
+
+    if (requestId !== journeyState.requestId) {
+      return;
+    }
+
+    journeyState.poems = createFallbackJourneyPoems();
+    journeyState.poems.forEach((poem, index) => {
+      updateJourneyCardPoem(index, poem);
+    });
+  }
 };
 
 const enterJourneyWhenReady = () => {
@@ -396,32 +475,15 @@ const enterJourneyWhenReady = () => {
 
   journeyBeforeWordsTimer = window.setTimeout(async () => {
     showBeforeWordsGate();
+    await waitForBeforeWordsPaint();
 
-    try {
-      await waitForBeforeWordsPaint();
-      const poems = await requestJourneyPoems(
-        journeyState.acceptedFiles,
-        requestId,
-      );
-
-      if (requestId !== journeyState.requestId) {
-        return;
-      }
-
-      journeyState.poems = poems;
-    } catch (error) {
-      console.error("journey request failed; using fallback poems", {
-        message: error?.message,
-      });
-
-      if (requestId !== journeyState.requestId) {
-        return;
-      }
-
-      journeyState.poems = createFallbackJourneyPoems();
+    if (requestId !== journeyState.requestId) {
+      return;
     }
 
+    journeyState.poems = createBeforeWordsJourneyPoems();
     createJourneyCards(journeyState.poems);
+    startJourneyPoemRequest(requestId);
   }, 260);
 };
 
@@ -514,5 +576,6 @@ quietMomentInput?.addEventListener("change", () => {
 window.addEventListener("beforeunload", () => {
   window.clearTimeout(settleTimer);
   window.clearTimeout(journeyBeforeWordsTimer);
+  clearPoemUpdateTimers();
   clearJourneyPhotoUrls();
 });
