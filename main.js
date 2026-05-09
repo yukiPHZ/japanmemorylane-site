@@ -256,7 +256,9 @@ const showJourneyStar = () => {
   star.className = "journey-star";
   star.setAttribute("aria-hidden", "true");
 
-  const removeTimer = window.setTimeout(() => star.remove(), 2600);
+  console.log("journey star shown");
+
+  const removeTimer = window.setTimeout(() => star.remove(), 2100);
 
   star.addEventListener("animationend", () => {
     window.clearTimeout(removeTimer);

@@ -240,18 +240,20 @@ body.has-journey .site-foot {
 
 .journey-star {
   position: fixed;
-  top: 12vh;
-  right: max(26px, calc((100vw - 430px) / 2 + 30px));
+  top: 16vh;
+  right: max(48px, calc((100vw - 430px) / 2 + 54px));
   z-index: 3;
-  width: 3px;
-  height: 3px;
+  width: 6px;
+  height: 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: 0 0 5px rgba(255, 255, 255, 0.24);
-  filter: blur(0.25px);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 0 7px rgba(255, 255, 255, 0.42),
+    0 0 15px rgba(255, 255, 255, 0.18);
+  filter: blur(0.08px);
   opacity: 0;
   pointer-events: none;
-  animation: journeyStarPass 2100ms linear forwards;
+  animation: journeyStarPass 1600ms linear forwards;
 }
 
 .journey-star::after {
@@ -259,14 +261,14 @@ body.has-journey .site-foot {
   position: absolute;
   left: 1px;
   top: 50%;
-  width: 72px;
+  width: 82px;
   height: 1px;
   background: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0.28),
+    rgba(255, 255, 255, 0.42),
     rgba(255, 255, 255, 0)
   );
-  opacity: 0.46;
+  opacity: 0.58;
   transform: translateY(-50%) rotate(-38deg);
   transform-origin: left center;
 }
@@ -539,15 +541,15 @@ body.js-ready .tanzaku.is-poem-waiting.show-english-poem .en-poem {
   }
 
   14% {
-    opacity: 0.62;
+    opacity: 0.82;
   }
 
   72% {
-    opacity: 0.48;
+    opacity: 0.66;
   }
 
   100% {
     opacity: 0;
-    transform: translate3d(-72vw, 72vh, 0);
+    transform: translate3d(-62vw, 64vh, 0);
   }
 }
