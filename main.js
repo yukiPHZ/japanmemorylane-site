@@ -106,17 +106,6 @@ const createBeforeWordsJourneyPoems = () =>
     source: "before-words",
   }));
 
-const normalizeJourneyResponse = (responseJson) => {
-  const journey = Array.isArray(responseJson?.journey)
-    ? responseJson.journey
-    : [];
-
-  return Array.from({ length: journeyLimit }, (_, index) => {
-    const poem = normalizeJourneyPoem(journey[index]);
-    return poem || { ...fallbackPoem };
-  });
-};
-
 const findClosestTanzaku = () => {
   const laneTop = lane.getBoundingClientRect().top;
   return tanzakuItems.reduce(
@@ -207,52 +196,49 @@ const setJourneyCount = (count) => {
   }
 };
 
-const readJourneyErrorJson = async (response) => {
+const readPoemErrorJson = async (response) => {
   try {
     return await response.json();
   } catch {
     return {
-      error: "journey_request_failed",
+      error: "poem_request_failed",
       status: response.status,
     };
   }
 };
 
-const requestJourneyPoems = async (files, requestId) => {
-  const journeyFiles = files.slice(0, journeyLimit);
+const requestPoemForCard = async (file, index, requestId) => {
   const formData = new FormData();
+  formData.append("image", file);
 
-  journeyFiles.forEach((file, index) => {
-    formData.append("images", file);
-    console.log(`generating poem: ${index + 1}/${journeyLimit}`);
-  });
-
-  console.log("journey request started", {
+  console.log("poem request started:", index + 1, {
     requestId,
-    acceptedFiles: journeyFiles.length,
   });
 
-  const response = await fetch("/api/journey", {
+  const response = await fetch("/api/poem", {
     method: "POST",
     body: formData,
   });
 
   if (!response.ok) {
-    const errorJson = await readJourneyErrorJson(response);
-    console.error("journey request failed", errorJson);
-    throw new Error(`Journey request failed with ${response.status}`);
+    const errorJson = await readPoemErrorJson(response);
+    console.error("poem request failed:", index + 1, errorJson);
+    throw new Error(`Poem request failed with ${response.status}`);
   }
 
   const responseJson = await response.json();
+  const poem = normalizeJourneyPoem(responseJson);
 
-  console.log("journey response received", {
+  if (!poem) {
+    throw new Error("Poem response was invalid");
+  }
+
+  console.log("poem response received:", index + 1, {
     requestId,
-    count: Array.isArray(responseJson?.journey)
-      ? responseJson.journey.length
-      : 0,
+    source: poem.source,
   });
 
-  return normalizeJourneyResponse(responseJson);
+  return poem;
 };
 
 const waitForBeforeWordsPaint = () =>
@@ -424,35 +410,32 @@ const createJourneyCards = (poems = journeyState.poems) => {
   });
 };
 
-const startJourneyPoemRequest = async (requestId) => {
-  try {
-    const poems = await requestJourneyPoems(
-      journeyState.acceptedFiles,
-      requestId,
-    );
+const startJourneyPoemRequest = (requestId) => {
+  journeyState.acceptedFiles
+    .slice(0, journeyLimit)
+    .forEach((file, index) => {
+      requestPoemForCard(file, index, requestId)
+        .then((poem) => {
+          if (requestId !== journeyState.requestId) {
+            return;
+          }
 
-    if (requestId !== journeyState.requestId) {
-      return;
-    }
+          journeyState.poems[index] = poem;
+          updateJourneyCardPoem(index, poem);
+        })
+        .catch((error) => {
+          console.error("poem request failed:", index + 1, {
+            message: error?.message,
+          });
 
-    journeyState.poems = poems;
-    poems.forEach((poem, index) => {
-      updateJourneyCardPoem(index, poem);
+          if (requestId !== journeyState.requestId) {
+            return;
+          }
+
+          journeyState.poems[index] = { ...fallbackPoem };
+          updateJourneyCardPoem(index, journeyState.poems[index]);
+        });
     });
-  } catch (error) {
-    console.error("journey request failed", {
-      message: error?.message,
-    });
-
-    if (requestId !== journeyState.requestId) {
-      return;
-    }
-
-    journeyState.poems = createFallbackJourneyPoems();
-    journeyState.poems.forEach((poem, index) => {
-      updateJourneyCardPoem(index, poem);
-    });
-  }
 };
 
 const enterJourneyWhenReady = () => {
