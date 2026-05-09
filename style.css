@@ -290,6 +290,25 @@ body.is-entering-lane .journey-gate {
   transition: opacity 760ms ease;
 }
 
+.journey-gate.is-before-words .journey-gate-inner {
+  gap: 22px;
+}
+
+.journey-gate.is-before-words .journey-gate-ja {
+  min-height: 7em;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  color: rgba(31, 31, 31, 0.66);
+  font-size: 24px;
+  line-height: 1.95;
+  letter-spacing: 0;
+}
+
+.journey-gate.is-before-words .journey-gate-en {
+  color: rgba(31, 31, 31, 0.28);
+  font-size: 11px;
+}
+
 .journey-gate-count {
   position: absolute;
   right: max(18px, calc((100vw - 430px) / 2 + 18px));
@@ -302,6 +321,14 @@ body.is-entering-lane .journey-gate {
 body.is-entering-lane .journey-gate-ja,
 body.is-entering-lane .journey-gate-en {
   opacity: 0.42;
+}
+
+body.is-entering-lane .journey-gate.is-before-words .journey-gate-ja {
+  opacity: 0.82;
+}
+
+body.is-entering-lane .journey-gate.is-before-words .journey-gate-en {
+  opacity: 0.38;
 }
 
 body.js-ready .jp-poem,

@@ -5,28 +5,63 @@ const quietMomentInput = document.querySelector("#quietMomentInput");
 const journeyEntry = document.querySelector("#journeyEntry");
 const journeyCount = document.querySelector("#journeyCount");
 const journeyGate = document.querySelector("#journeyGate");
+const journeyGateJapanese = document.querySelector("#journeyGateJapanese");
+const journeyGateEnglish = document.querySelector("#journeyGateEnglish");
 const journeyGateCount = document.querySelector("#journeyGateCount");
 
 const journeyLimit = 7;
 const quietImageExtensions = /\.(jpe?g|png|webp|heic|heif|gif|avif)$/i;
-const journeyPoem = {
+const journeyIntro = {
+  japanese: "七つ、\nことばの前へ",
+  english: "Seven moments,\nbefore words.",
+};
+const beforeWords = {
   japanese: ["ことばの前"],
   english: ["before words"],
 };
 
+const journeyState = {
+  acceptedFiles: [],
+  currentIndex: 0,
+  gate: "idle",
+  ready: false,
+};
+
 let settleTimer;
-let journeyCountTimer;
-let journeyEnterFadeTimer;
+let journeyBeforeWordsTimer;
 let journeyEnterApplyTimer;
-let journeyFiles = [];
 let selectedJourneyPhotoUrls = [];
-let isJourneyEntering = false;
 
 const setScreenHeight = () => {
   document.documentElement.style.setProperty(
     "--screen-height",
     `${window.innerHeight}px`,
   );
+};
+
+const renderPoemLines = (element, lines) => {
+  if (!element) {
+    return;
+  }
+
+  element.replaceChildren();
+  lines.forEach((line, index) => {
+    if (index > 0) {
+      element.append(document.createElement("br"));
+    }
+
+    element.append(document.createTextNode(line));
+  });
+};
+
+const renderGateText = ({ japanese, english }) => {
+  if (journeyGateJapanese) {
+    renderPoemLines(journeyGateJapanese, String(japanese).split("\n"));
+  }
+
+  if (journeyGateEnglish) {
+    renderPoemLines(journeyGateEnglish, String(english).split("\n"));
+  }
 };
 
 const findClosestTanzaku = () => {
@@ -50,10 +85,13 @@ const setCurrentTanzaku = (item) => {
     return;
   }
 
+  journeyState.currentIndex = Number(item.dataset.index || 1) - 1;
   currentMemory.textContent = item.dataset.index;
   tanzakuItems.forEach((tanzaku) => {
     tanzaku.classList.toggle("is-current", tanzaku === item);
   });
+
+  console.log("current index", journeyState.currentIndex);
 };
 
 const markTanzakuSeen = (item) => {
@@ -62,6 +100,21 @@ const markTanzakuSeen = (item) => {
   }
 
   item.classList.add("has-been-seen");
+};
+
+const activateFirstCard = () => {
+  const firstCard = tanzakuItems[0];
+
+  if (!firstCard) {
+    return;
+  }
+
+  setCurrentTanzaku(firstCard);
+  markTanzakuSeen(firstCard);
+
+  console.log("first card activated", {
+    currentIndex: journeyState.currentIndex,
+  });
 };
 
 const updateAfterSettle = () => {
@@ -79,21 +132,6 @@ const queueSettleUpdate = () => {
   settleTimer = window.setTimeout(updateAfterSettle, 180);
 };
 
-const renderPoemLines = (element, lines) => {
-  if (!element) {
-    return;
-  }
-
-  element.replaceChildren();
-  lines.forEach((line, index) => {
-    if (index > 0) {
-      element.append(document.createElement("br"));
-    }
-
-    element.append(document.createTextNode(line));
-  });
-};
-
 const isQuietImageFile = (file) => {
   if (!file) {
     return false;
@@ -104,26 +142,63 @@ const isQuietImageFile = (file) => {
 };
 
 const setJourneyCount = (count) => {
-  const nextText = `${Math.min(count, journeyLimit)} / ${journeyLimit}`;
+  const safeCount = Math.min(count, journeyLimit);
+  const nextText = `${safeCount} / ${journeyLimit}`;
 
   if (journeyCount) {
     journeyCount.textContent = nextText;
   }
 
   if (journeyGateCount) {
-    journeyGateCount.textContent = String(Math.min(count, journeyLimit));
+    journeyGateCount.textContent = String(safeCount);
   }
 };
 
+const setGateIntro = () => {
+  journeyGate?.classList.remove("is-before-words");
+  renderGateText(journeyIntro);
+};
+
 const showJourneyGate = () => {
+  if (journeyState.ready) {
+    return;
+  }
+
+  if (journeyState.gate !== "before-words") {
+    setGateIntro();
+  }
+
+  journeyState.gate = "selecting";
   document.body.classList.add("is-choosing-journey");
   journeyGate?.setAttribute("aria-hidden", "false");
-  setJourneyCount(journeyFiles.length);
+  setJourneyCount(journeyState.acceptedFiles.length);
+
+  console.log("journey gate shown", {
+    acceptedFiles: journeyState.acceptedFiles.length,
+  });
+};
+
+const showBeforeWordsGate = () => {
+  journeyState.gate = "before-words";
+  journeyGate?.classList.add("is-before-words");
+  renderGateText({
+    japanese: beforeWords.japanese.join("\n"),
+    english: beforeWords.english.join("\n"),
+  });
+  document.body.classList.add("is-entering-lane");
+  setJourneyCount(journeyLimit);
+
+  console.log("journey gate shown", {
+    state: "before-words",
+    acceptedFiles: journeyState.acceptedFiles.length,
+  });
 };
 
 const hideJourneyGate = () => {
   document.body.classList.remove("is-choosing-journey", "is-entering-lane");
+  journeyGate?.classList.remove("is-before-words");
   journeyGate?.setAttribute("aria-hidden", "true");
+  journeyState.gate = "hidden";
 };
 
 const clearJourneyPhotoUrls = () => {
@@ -144,11 +219,13 @@ const resetTanzakuReveal = () => {
   });
 };
 
-const applyJourneyFiles = () => {
+const createJourneyCards = () => {
+  const journeyItems = journeyState.acceptedFiles.slice(0, journeyLimit);
+
   clearJourneyPhotoUrls();
   resetTanzakuReveal();
 
-  journeyFiles.slice(0, journeyLimit).forEach((file, index) => {
+  journeyItems.forEach((file, index) => {
     const item = tanzakuItems[index];
     const image = item?.querySelector(".memory-photo img");
     const japanesePoem = item?.querySelector(".jp-poem");
@@ -164,10 +241,11 @@ const applyJourneyFiles = () => {
     image.alt = `A quiet moment ${index + 1} selected for Japan Memory Lane`;
     image.loading = index === 0 ? "eager" : "lazy";
 
-    renderPoemLines(japanesePoem, journeyPoem.japanese);
-    renderPoemLines(englishPoem, journeyPoem.english);
+    renderPoemLines(japanesePoem, beforeWords.japanese);
+    renderPoemLines(englishPoem, beforeWords.english);
   });
 
+  journeyState.ready = true;
   document.body.classList.add("has-journey");
   hideJourneyGate();
   setJourneyCount(journeyLimit);
@@ -176,76 +254,61 @@ const applyJourneyFiles = () => {
     lane.scrollTo({ top: 0, behavior: "auto" });
   }
 
-  window.setTimeout(updateAfterSettle, 80);
+  activateFirstCard();
 
-  console.log("Japan Memory Lane journey entered", {
-    source: "local-files",
-    count: journeyFiles.length,
+  console.log("journey cards created", {
+    count: journeyItems.length,
   });
 };
 
-const enterJourney = () => {
-  if (isJourneyEntering) {
+const enterJourneyWhenReady = () => {
+  if (journeyState.ready || journeyState.acceptedFiles.length < journeyLimit) {
     return;
   }
 
-  isJourneyEntering = true;
-  window.clearTimeout(journeyEnterFadeTimer);
+  window.clearTimeout(journeyBeforeWordsTimer);
   window.clearTimeout(journeyEnterApplyTimer);
 
-  journeyEnterFadeTimer = window.setTimeout(() => {
-    document.body.classList.add("is-entering-lane");
-  }, 260);
-
-  journeyEnterApplyTimer = window.setTimeout(() => {
-    applyJourneyFiles();
-  }, 1120);
+  journeyBeforeWordsTimer = window.setTimeout(showBeforeWordsGate, 260);
+  journeyEnterApplyTimer = window.setTimeout(createJourneyCards, 1260);
 };
 
-const queueJourneyFiles = (files) => {
-  if (isJourneyEntering || journeyFiles.length >= journeyLimit) {
+const acceptSelectedFiles = (selectedFiles) => {
+  const selectedFileList = [...selectedFiles];
+  const remainingSlots = journeyLimit - journeyState.acceptedFiles.length;
+  const nextAcceptedFiles = selectedFileList
+    .filter(isQuietImageFile)
+    .slice(0, Math.max(remainingSlots, 0));
+
+  journeyState.acceptedFiles = [
+    ...journeyState.acceptedFiles,
+    ...nextAcceptedFiles,
+  ].slice(0, journeyLimit);
+
+  console.log("selected files:", selectedFileList.length);
+  console.log("accepted files:", journeyState.acceptedFiles.length);
+
+  setJourneyCount(journeyState.acceptedFiles.length);
+};
+
+const handleJourneySelection = (files) => {
+  if (journeyState.ready) {
     return;
   }
-
-  const availableFiles = [...files]
-    .filter(isQuietImageFile)
-    .slice(0, journeyLimit - journeyFiles.length);
 
   showJourneyGate();
+  acceptSelectedFiles(files);
 
-  if (availableFiles.length === 0) {
+  if (journeyState.acceptedFiles.length < journeyLimit) {
     return;
   }
 
-  let nextIndex = 0;
-  window.clearTimeout(journeyCountTimer);
-
-  const addNextFile = () => {
-    if (nextIndex >= availableFiles.length || journeyFiles.length >= journeyLimit) {
-      if (journeyFiles.length >= journeyLimit) {
-        enterJourney();
-      }
-
-      return;
-    }
-
-    journeyFiles.push(availableFiles[nextIndex]);
-    nextIndex += 1;
-    setJourneyCount(journeyFiles.length);
-
-    if (journeyFiles.length >= journeyLimit) {
-      enterJourney();
-      return;
-    }
-
-    journeyCountTimer = window.setTimeout(addNextFile, 150);
-  };
-
-  addNextFile();
+  enterJourneyWhenReady();
 };
 
 document.body.classList.add("js-ready");
 
+setGateIntro();
 setScreenHeight();
 updateAfterSettle();
 setJourneyCount(0);
@@ -284,7 +347,7 @@ if (lane) {
 journeyEntry?.addEventListener("click", showJourneyGate);
 
 journeyGate?.addEventListener("click", () => {
-  if (!isJourneyEntering) {
+  if (!journeyState.ready && journeyState.gate !== "before-words") {
     quietMomentInput?.click();
   }
 });
@@ -292,14 +355,13 @@ journeyGate?.addEventListener("click", () => {
 quietMomentInput?.addEventListener("click", showJourneyGate);
 
 quietMomentInput?.addEventListener("change", () => {
-  queueJourneyFiles(quietMomentInput.files || []);
+  handleJourneySelection(quietMomentInput.files || []);
   quietMomentInput.value = "";
 });
 
 window.addEventListener("beforeunload", () => {
   window.clearTimeout(settleTimer);
-  window.clearTimeout(journeyCountTimer);
-  window.clearTimeout(journeyEnterFadeTimer);
+  window.clearTimeout(journeyBeforeWordsTimer);
   window.clearTimeout(journeyEnterApplyTimer);
   clearJourneyPhotoUrls();
 });
