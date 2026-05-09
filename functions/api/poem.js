@@ -289,7 +289,20 @@ const validatePoem = (poem) => {
 };
 
 const requestOpenAIPoem = async ({ apiKey, model, file }) => {
-  const arrayBuffer = await file.arrayBuffer();
+  let arrayBuffer;
+
+  try {
+    arrayBuffer = await file.arrayBuffer();
+  } catch (error) {
+    console.error("Poem image arrayBuffer failed", {
+      imageType: file?.type || null,
+      message: error?.message,
+    });
+    throw poemError("invalid_image", "Image could not be read", {
+      responseStatus: 400,
+      diagnosticStatus: 400,
+    });
+  }
 
   if (arrayBuffer.byteLength > MAX_IMAGE_BYTES) {
     throw poemError("invalid_image", "Image is too large", {
@@ -312,7 +325,22 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
     imageDetail: IMAGE_DETAIL,
   });
 
-  const imageUrl = `data:${file.type};base64,${toBase64(arrayBuffer)}`;
+  let imageUrl;
+
+  try {
+    imageUrl = `data:${file.type};base64,${toBase64(arrayBuffer)}`;
+  } catch (error) {
+    console.error("Poem image base64 conversion failed", {
+      imageType: file?.type || null,
+      imageBytes: arrayBuffer.byteLength,
+      message: error?.message,
+    });
+    throw poemError("invalid_image", "Image could not be encoded", {
+      responseStatus: 400,
+      diagnosticStatus: 400,
+    });
+  }
+
   let response;
 
   try {
@@ -436,8 +464,27 @@ export async function onRequest({ request, env }) {
       });
     }
 
-    const formData = await request.formData();
+    let formData;
+
+    try {
+      formData = await request.formData();
+    } catch (error) {
+      console.error("Poem multipart formData failed", {
+        contentTypeHead: contentType.slice(0, 80),
+        message: error?.message,
+      });
+      throw poemError("invalid_image", "Multipart form data could not be read", {
+        responseStatus: 400,
+        diagnosticStatus: 400,
+      });
+    }
+
     const image = formData.get("image");
+    console.log("Poem form image received", {
+      hasImage: Boolean(image),
+      imageType: image?.type || null,
+      imageSize: typeof image?.size === "number" ? image.size : null,
+    });
 
     if (!isImageFile(image)) {
       console.error("Poem image was missing or unsupported", {

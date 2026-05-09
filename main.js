@@ -36,6 +36,7 @@ const journeyState = {
 
 let settleTimer;
 let journeyBeforeWordsTimer;
+let poemRequestTimers = [];
 let poemUpdateTimers = [];
 let selectedJourneyPhotoUrls = [];
 
@@ -222,8 +223,10 @@ const requestPoemForCard = async (file, index, requestId) => {
 
   if (!response.ok) {
     const errorJson = await readPoemErrorJson(response);
-    console.error("poem request failed:", index + 1, errorJson);
-    throw new Error(`Poem request failed with ${response.status}`);
+    const error = new Error(`Poem request failed with ${response.status}`);
+    error.status = response.status;
+    error.detail = errorJson;
+    throw error;
   }
 
   const responseJson = await response.json();
@@ -235,6 +238,7 @@ const requestPoemForCard = async (file, index, requestId) => {
 
   console.log("poem response received:", index + 1, {
     requestId,
+    status: response.status,
     source: poem.source,
   });
 
@@ -305,6 +309,11 @@ const clearJourneyPhotoUrls = () => {
   selectedJourneyPhotoUrls = [];
 };
 
+const clearPoemRequestTimers = () => {
+  poemRequestTimers.forEach((timer) => window.clearTimeout(timer));
+  poemRequestTimers = [];
+};
+
 const clearPoemUpdateTimers = () => {
   poemUpdateTimers.forEach((timer) => window.clearTimeout(timer));
   poemUpdateTimers = [];
@@ -357,6 +366,7 @@ const createJourneyCards = (poems = journeyState.poems) => {
   const journeyPoems =
     poems.length > 0 ? poems : createBeforeWordsJourneyPoems();
 
+  clearPoemRequestTimers();
   clearPoemUpdateTimers();
   clearJourneyPhotoUrls();
   resetTanzakuReveal();
@@ -414,27 +424,43 @@ const startJourneyPoemRequest = (requestId) => {
   journeyState.acceptedFiles
     .slice(0, journeyLimit)
     .forEach((file, index) => {
-      requestPoemForCard(file, index, requestId)
-        .then((poem) => {
-          if (requestId !== journeyState.requestId) {
-            return;
-          }
+      const delayMs = index * 1500;
 
-          journeyState.poems[index] = poem;
-          updateJourneyCardPoem(index, poem);
-        })
-        .catch((error) => {
-          console.error("poem request failed:", index + 1, {
-            message: error?.message,
+      console.log("poem request scheduled:", {
+        index: index + 1,
+        delayMs,
+      });
+
+      const timer = window.setTimeout(() => {
+        if (requestId !== journeyState.requestId) {
+          return;
+        }
+
+        requestPoemForCard(file, index, requestId)
+          .then((poem) => {
+            if (requestId !== journeyState.requestId) {
+              return;
+            }
+
+            journeyState.poems[index] = poem;
+            updateJourneyCardPoem(index, poem);
+          })
+          .catch((error) => {
+            console.error("poem request failed:", index + 1, {
+              status: error?.status || error?.detail?.status || null,
+              error: error?.detail || error?.message || "unknown",
+            });
+
+            if (requestId !== journeyState.requestId) {
+              return;
+            }
+
+            journeyState.poems[index] = { ...fallbackPoem };
+            updateJourneyCardPoem(index, journeyState.poems[index]);
           });
+      }, delayMs);
 
-          if (requestId !== journeyState.requestId) {
-            return;
-          }
-
-          journeyState.poems[index] = { ...fallbackPoem };
-          updateJourneyCardPoem(index, journeyState.poems[index]);
-        });
+      poemRequestTimers.push(timer);
     });
 };
 
@@ -559,6 +585,7 @@ quietMomentInput?.addEventListener("change", () => {
 window.addEventListener("beforeunload", () => {
   window.clearTimeout(settleTimer);
   window.clearTimeout(journeyBeforeWordsTimer);
+  clearPoemRequestTimers();
   clearPoemUpdateTimers();
   clearJourneyPhotoUrls();
 });
