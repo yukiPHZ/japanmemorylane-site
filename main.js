@@ -2,31 +2,25 @@ const lane = document.querySelector(".lane");
 const tanzakuItems = [...document.querySelectorAll(".tanzaku")];
 const currentMemory = document.querySelector("#currentMemory");
 const quietMomentInput = document.querySelector("#quietMomentInput");
-const firstMemoryPhoto = document.querySelector("#firstMemoryPhoto");
-const firstMemoryJapanesePoem = document.querySelector(
-  "#firstMemoryJapanesePoem",
-);
-const firstMemoryEnglishPoem = document.querySelector("#firstMemoryEnglishPoem");
-const quietImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
-const quietImageExtensions = /\.(jpe?g|png|webp)$/i;
-const firstTanzaku = firstMemoryPhoto?.closest(".tanzaku");
-const fallbackPoem = {
-  japanese: ["……"],
-  english: ["……"],
-};
-const loadingPoem = {
+const journeyEntry = document.querySelector("#journeyEntry");
+const journeyCount = document.querySelector("#journeyCount");
+const journeyGate = document.querySelector("#journeyGate");
+const journeyGateCount = document.querySelector("#journeyGateCount");
+
+const journeyLimit = 7;
+const quietImageExtensions = /\.(jpe?g|png|webp|heic|heif|gif|avif)$/i;
+const journeyPoem = {
   japanese: ["ことばの前"],
   english: ["before words"],
 };
-let settleTimer;
-let japanesePoemTimer;
-let englishPoemTimer;
-let selectedPhotoUrl;
-let poemRequestId = 0;
 
-const emitTanzakuEvent = (name, detail = {}) => {
-  window.dispatchEvent(new CustomEvent(name, { detail }));
-};
+let settleTimer;
+let journeyCountTimer;
+let journeyEnterFadeTimer;
+let journeyEnterApplyTimer;
+let journeyFiles = [];
+let selectedJourneyPhotoUrls = [];
+let isJourneyEntering = false;
 
 const setScreenHeight = () => {
   document.documentElement.style.setProperty(
@@ -85,10 +79,176 @@ const queueSettleUpdate = () => {
   settleTimer = window.setTimeout(updateAfterSettle, 180);
 };
 
+const renderPoemLines = (element, lines) => {
+  if (!element) {
+    return;
+  }
+
+  element.replaceChildren();
+  lines.forEach((line, index) => {
+    if (index > 0) {
+      element.append(document.createElement("br"));
+    }
+
+    element.append(document.createTextNode(line));
+  });
+};
+
+const isQuietImageFile = (file) => {
+  if (!file) {
+    return false;
+  }
+
+  const fileType = typeof file.type === "string" ? file.type : "";
+  return fileType.startsWith("image/") || quietImageExtensions.test(file.name);
+};
+
+const setJourneyCount = (count) => {
+  const nextText = `${Math.min(count, journeyLimit)} / ${journeyLimit}`;
+
+  if (journeyCount) {
+    journeyCount.textContent = nextText;
+  }
+
+  if (journeyGateCount) {
+    journeyGateCount.textContent = String(Math.min(count, journeyLimit));
+  }
+};
+
+const showJourneyGate = () => {
+  document.body.classList.add("is-choosing-journey");
+  journeyGate?.setAttribute("aria-hidden", "false");
+  setJourneyCount(journeyFiles.length);
+};
+
+const hideJourneyGate = () => {
+  document.body.classList.remove("is-choosing-journey", "is-entering-lane");
+  journeyGate?.setAttribute("aria-hidden", "true");
+};
+
+const clearJourneyPhotoUrls = () => {
+  selectedJourneyPhotoUrls.forEach((url) => URL.revokeObjectURL(url));
+  selectedJourneyPhotoUrls = [];
+};
+
+const resetTanzakuReveal = () => {
+  tanzakuItems.forEach((item) => {
+    item.classList.remove(
+      "has-been-seen",
+      "is-current",
+      "is-poem-waiting",
+      "is-poem-loading",
+      "show-japanese-poem",
+      "show-english-poem",
+    );
+  });
+};
+
+const applyJourneyFiles = () => {
+  clearJourneyPhotoUrls();
+  resetTanzakuReveal();
+
+  journeyFiles.slice(0, journeyLimit).forEach((file, index) => {
+    const item = tanzakuItems[index];
+    const image = item?.querySelector(".memory-photo img");
+    const japanesePoem = item?.querySelector(".jp-poem");
+    const englishPoem = item?.querySelector(".en-poem");
+
+    if (!item || !image) {
+      return;
+    }
+
+    const photoUrl = URL.createObjectURL(file);
+    selectedJourneyPhotoUrls.push(photoUrl);
+    image.src = photoUrl;
+    image.alt = `A quiet moment ${index + 1} selected for Japan Memory Lane`;
+    image.loading = index === 0 ? "eager" : "lazy";
+
+    renderPoemLines(japanesePoem, journeyPoem.japanese);
+    renderPoemLines(englishPoem, journeyPoem.english);
+  });
+
+  document.body.classList.add("has-journey");
+  hideJourneyGate();
+  setJourneyCount(journeyLimit);
+
+  if (lane) {
+    lane.scrollTo({ top: 0, behavior: "auto" });
+  }
+
+  window.setTimeout(updateAfterSettle, 80);
+
+  console.log("Japan Memory Lane journey entered", {
+    source: "local-files",
+    count: journeyFiles.length,
+  });
+};
+
+const enterJourney = () => {
+  if (isJourneyEntering) {
+    return;
+  }
+
+  isJourneyEntering = true;
+  window.clearTimeout(journeyEnterFadeTimer);
+  window.clearTimeout(journeyEnterApplyTimer);
+
+  journeyEnterFadeTimer = window.setTimeout(() => {
+    document.body.classList.add("is-entering-lane");
+  }, 260);
+
+  journeyEnterApplyTimer = window.setTimeout(() => {
+    applyJourneyFiles();
+  }, 1120);
+};
+
+const queueJourneyFiles = (files) => {
+  if (isJourneyEntering || journeyFiles.length >= journeyLimit) {
+    return;
+  }
+
+  const availableFiles = [...files]
+    .filter(isQuietImageFile)
+    .slice(0, journeyLimit - journeyFiles.length);
+
+  showJourneyGate();
+
+  if (availableFiles.length === 0) {
+    return;
+  }
+
+  let nextIndex = 0;
+  window.clearTimeout(journeyCountTimer);
+
+  const addNextFile = () => {
+    if (nextIndex >= availableFiles.length || journeyFiles.length >= journeyLimit) {
+      if (journeyFiles.length >= journeyLimit) {
+        enterJourney();
+      }
+
+      return;
+    }
+
+    journeyFiles.push(availableFiles[nextIndex]);
+    nextIndex += 1;
+    setJourneyCount(journeyFiles.length);
+
+    if (journeyFiles.length >= journeyLimit) {
+      enterJourney();
+      return;
+    }
+
+    journeyCountTimer = window.setTimeout(addNextFile, 150);
+  };
+
+  addNextFile();
+};
+
 document.body.classList.add("js-ready");
 
 setScreenHeight();
 updateAfterSettle();
+setJourneyCount(0);
 
 if ("IntersectionObserver" in window && lane) {
   const observer = new IntersectionObserver(
@@ -121,322 +281,25 @@ if (lane) {
   lane.addEventListener("scroll", queueSettleUpdate, { passive: true });
 }
 
-const isQuietImageFile = (file) => {
-  if (!file) {
-    return false;
+journeyEntry?.addEventListener("click", showJourneyGate);
+
+journeyGate?.addEventListener("click", () => {
+  if (!isJourneyEntering) {
+    quietMomentInput?.click();
   }
+});
 
-  return quietImageTypes.has(file.type) || quietImageExtensions.test(file.name);
-};
+quietMomentInput?.addEventListener("click", showJourneyGate);
 
-const renderPoemLines = (element, lines) => {
-  if (!element) {
-    return;
-  }
-
-  element.replaceChildren();
-  lines.forEach((line, index) => {
-    if (index > 0) {
-      element.append(document.createElement("br"));
-    }
-
-    element.append(document.createTextNode(line));
-  });
-};
-
-const chooseQuietPoem = () => fallbackPoem;
-
-const getLoadingKanaCount = () => {
-  if (!firstMemoryJapanesePoem) {
-    return 0;
-  }
-
-  if (typeof firstMemoryJapanesePoem.querySelectorAll === "function") {
-    return firstMemoryJapanesePoem.querySelectorAll(".loading-kana").length;
-  }
-
-  return Array.from(firstMemoryJapanesePoem.children || []).filter(
-    (child) => child.className === "loading-kana",
-  ).length;
-};
-
-const getElementMarkup = (element) =>
-  typeof element?.innerHTML === "string" ? element.innerHTML : element?.textContent;
-
-const renderLoadingJapanesePoem = () => {
-  console.log("loading poem render start", {
-    japanese: loadingPoem.japanese[0],
-    english: loadingPoem.english[0],
-  });
-  console.log("loading poem element found", {
-    japanese: Boolean(firstMemoryJapanesePoem),
-    english: Boolean(firstMemoryEnglishPoem),
-    tanzaku: Boolean(firstTanzaku),
-  });
-
-  if (!firstMemoryJapanesePoem) {
-    return;
-  }
-
-  firstMemoryJapanesePoem.replaceChildren();
-  [...loadingPoem.japanese[0]].forEach((character, index) => {
-    const characterElement = document.createElement("span");
-    characterElement.className = "loading-kana";
-    characterElement.style.setProperty("--loading-delay", `${index * 0.46}s`);
-    characterElement.append(document.createTextNode(character));
-    firstMemoryJapanesePoem.append(characterElement);
-  });
-
-  console.log("loading poem html", {
-    japanese: getElementMarkup(firstMemoryJapanesePoem),
-  });
-  console.log("loading kana count", {
-    count: getLoadingKanaCount(),
-  });
-};
-
-const showLoadingPoem = () => {
-  renderLoadingJapanesePoem();
-  renderPoemLines(firstMemoryEnglishPoem, loadingPoem.english);
-
-  console.log("Japan Memory Lane frontend render text", {
-    source: "loading",
-    japanese: loadingPoem.japanese.join("\n"),
-    english: loadingPoem.english.join("\n"),
-  });
-};
-
-const splitPoemLines = (poem) =>
-  String(poem || "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-const normalizePoem = (poem) => {
-  const japanese = Array.isArray(poem?.japanese)
-    ? poem.japanese
-    : splitPoemLines(poem?.japanese_poem);
-  const english = Array.isArray(poem?.english)
-    ? poem.english
-    : splitPoemLines(poem?.english_poem);
-
-  if (japanese.length === 0 || english.length === 0) {
-    return null;
-  }
-
-  return {
-    japanese: japanese.slice(0, 3),
-    english: english.slice(0, 2),
-  };
-};
-
-const readPoemErrorJson = async (response) => {
-  try {
-    return await response.json();
-  } catch {
-    return {
-      error: "poem_request_failed",
-      stage: "unknown",
-      status: response.status,
-      message: "Poem request failed without JSON body",
-    };
-  }
-};
-
-const requestPoem = async (file) => {
-  const formData = new FormData();
-  formData.append("image", file);
-
-  const response = await fetch("/api/poem", {
-    method: "POST",
-    body: formData,
-  });
-
-  console.log("Japan Memory Lane API response", {
-    source: response.ok ? "api" : "fallback",
-    status: response.status,
-    ok: response.ok,
-  });
-
-  if (!response.ok) {
-    const errorJson = await readPoemErrorJson(response);
-    console.error("Poem request failed", errorJson);
-
-    const error = new Error(`Poem request failed with ${response.status}`);
-    error.detail = errorJson;
-    throw error;
-  }
-
-  const responseJson = await response.json();
-
-  console.log("Japan Memory Lane frontend received json", {
-    source: "api",
-    json: responseJson,
-  });
-
-  const poem = normalizePoem(responseJson);
-
-  if (!poem) {
-    throw new Error("Poem response was invalid");
-  }
-
-  return poem;
-};
-
-const clearPoemRevealTimers = () => {
-  window.clearTimeout(japanesePoemTimer);
-  window.clearTimeout(englishPoemTimer);
-};
-
-const waitForLoadingPaint = () =>
-  new Promise((resolve) => {
-    if (typeof window.requestAnimationFrame === "function") {
-      window.requestAnimationFrame(() => {
-        window.setTimeout(resolve, 24);
-      });
-      return;
-    }
-
-    window.setTimeout(resolve, 32);
-  });
-
-const setPoemsWaiting = () => {
-  if (!firstTanzaku) {
-    return;
-  }
-
-  showLoadingPoem();
-  firstTanzaku.classList.add("is-poem-waiting", "is-poem-loading");
-  firstTanzaku.classList.remove("show-japanese-poem", "show-english-poem");
-  emitTanzakuEvent("jml:tanzaku-pending", { requestId: poemRequestId });
-
-  console.log("loading class applied", {
-    isPoemWaiting: firstTanzaku.classList.contains("is-poem-waiting"),
-    isPoemLoading: firstTanzaku.classList.contains("is-poem-loading"),
-    japaneseText: firstMemoryJapanesePoem?.textContent || "",
-    englishText: firstMemoryEnglishPoem?.textContent || "",
-  });
-};
-
-const revealFirstMemoryPoems = () => {
-  if (!firstTanzaku) {
-    return;
-  }
-
-  japanesePoemTimer = window.setTimeout(() => {
-    firstTanzaku.classList.add("show-japanese-poem");
-  }, 1350);
-
-  englishPoemTimer = window.setTimeout(() => {
-    firstTanzaku.classList.add("show-english-poem");
-  }, 1870);
-};
-
-const replaceFirstMemoryPoemsAfterPause = (poem, source = "api") => {
-  const normalizedPoem = normalizePoem(poem);
-  const renderSource = normalizedPoem ? source : "fallback";
-  const nextPoem = normalizedPoem || chooseQuietPoem();
-
-  if (firstTanzaku) {
-    firstTanzaku.classList.remove("is-poem-loading");
-  }
-
-  console.log("Japan Memory Lane frontend render text", {
-    source: renderSource,
-    japanese: nextPoem.japanese.join("\n"),
-    english: nextPoem.english.join("\n"),
-  });
-
-  renderPoemLines(firstMemoryJapanesePoem, nextPoem.japanese);
-  renderPoemLines(firstMemoryEnglishPoem, nextPoem.english);
-  revealFirstMemoryPoems();
-  emitTanzakuEvent("jml:tanzaku-ready", {
-    source: renderSource,
-    requestId: poemRequestId,
-  });
-};
-
-const replaceFirstMemoryPoemsFromApi = async (file, requestId) => {
-  try {
-    await waitForLoadingPaint();
-
-    if (requestId !== poemRequestId) {
-      console.log("Japan Memory Lane skipped stale poem request", {
-        requestId,
-        currentRequestId: poemRequestId,
-      });
-      return;
-    }
-
-    const poem = await requestPoem(file);
-
-    if (requestId !== poemRequestId) {
-      console.log("Japan Memory Lane ignored stale poem response", {
-        requestId,
-        currentRequestId: poemRequestId,
-      });
-      return;
-    }
-
-    replaceFirstMemoryPoemsAfterPause(poem, "api");
-  } catch (error) {
-    console.error("Japan Memory Lane poem request failed; using fallback", {
-      source: "fallback",
-      message: error?.message,
-      detail: error?.detail || null,
-    });
-
-    if (requestId !== poemRequestId) {
-      console.log("Japan Memory Lane ignored stale poem fallback", {
-        requestId,
-        currentRequestId: poemRequestId,
-      });
-      return;
-    }
-
-    replaceFirstMemoryPoemsAfterPause(chooseQuietPoem(), "fallback");
-  }
-};
-
-const replaceFirstMemoryPhoto = (file) => {
-  if (!firstMemoryPhoto || !isQuietImageFile(file)) {
-    return;
-  }
-
-  const requestId = ++poemRequestId;
-  const nextPhotoUrl = URL.createObjectURL(file);
-  const previousPhotoUrl = selectedPhotoUrl;
-
-  selectedPhotoUrl = nextPhotoUrl;
-  firstMemoryPhoto.src = selectedPhotoUrl;
-  firstMemoryPhoto.alt = "A quiet moment selected for Japan Memory Lane";
-  clearPoemRevealTimers();
-  setPoemsWaiting();
-  replaceFirstMemoryPoemsFromApi(file, requestId);
-
-  if (previousPhotoUrl) {
-    URL.revokeObjectURL(previousPhotoUrl);
-  }
-};
-
-if (quietMomentInput) {
-  quietMomentInput.addEventListener("change", () => {
-    const [file] = quietMomentInput.files;
-
-    if (!isQuietImageFile(file)) {
-      quietMomentInput.value = "";
-      return;
-    }
-
-    replaceFirstMemoryPhoto(file);
-    quietMomentInput.value = "";
-  });
-}
+quietMomentInput?.addEventListener("change", () => {
+  queueJourneyFiles(quietMomentInput.files || []);
+  quietMomentInput.value = "";
+});
 
 window.addEventListener("beforeunload", () => {
-  clearPoemRevealTimers();
-
-  if (selectedPhotoUrl) {
-    URL.revokeObjectURL(selectedPhotoUrl);
-  }
+  window.clearTimeout(settleTimer);
+  window.clearTimeout(journeyCountTimer);
+  window.clearTimeout(journeyEnterFadeTimer);
+  window.clearTimeout(journeyEnterApplyTimer);
+  clearJourneyPhotoUrls();
 });

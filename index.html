@@ -54,14 +54,17 @@
       </div>
 
       <footer class="site-foot">
-        <label class="upload-link">
-          Upload a quiet moment in Japan.
+        <label class="upload-link journey-entry" id="journeyEntry">
+          <span class="entry-ja" lang="ja">七つ、<br />ことばの前へ</span>
+          <span class="entry-en">Seven moments,<br />before words.</span>
+          <span class="entry-count" id="journeyCount">0 / 7</span>
           <input
             class="quiet-file-input"
             id="quietMomentInput"
             type="file"
-            accept="image/jpeg,image/png,image/webp"
-            aria-label="Upload a quiet moment in Japan"
+            accept="image/*"
+            multiple
+            aria-label="Choose seven quiet moments in Japan"
           />
         </label>
       </footer>
@@ -158,23 +161,66 @@
         </p>
       </div>
     </section>
+
+    <section class="tanzaku" data-index="6" aria-label="Residential evening">
+      <div class="memory">
+        <figure class="memory-photo">
+          <img
+            src="./assets/quiet-window-rain.jpg"
+            alt="A quiet residential evening remembered softly"
+            loading="lazy"
+          />
+        </figure>
+
+        <p class="jp-poem" lang="ja">
+          夕方の道に<br />
+          影だけが<br />
+          残っていた
+        </p>
+
+        <p class="en-poem">
+          In the evening street,<br />
+          only the shadows stayed.
+        </p>
+      </div>
+    </section>
+
+    <section class="tanzaku" data-index="7" aria-label="Winter morning">
+      <div class="memory">
+        <figure class="memory-photo">
+          <img
+            src="./assets/small-shrine.jpg"
+            alt="A quiet winter morning in Japan"
+            loading="lazy"
+          />
+        </figure>
+
+        <p class="jp-poem" lang="ja">
+          朝の白さが<br />
+          まだ<br />
+          ほどけない
+        </p>
+
+        <p class="en-poem">
+          The morning whiteness<br />
+          had not yet loosened.
+        </p>
+      </div>
+    </section>
   </main>
 
+  <div class="journey-gate" id="journeyGate" aria-hidden="true">
+    <div class="journey-gate-inner">
+      <p class="journey-gate-ja" lang="ja">七つ、<br />ことばの前へ</p>
+      <p class="journey-gate-en">Seven moments,<br />before words.</p>
+    </div>
+    <p class="journey-gate-count"><span id="journeyGateCount">0</span> / 7</p>
+  </div>
+
   <p class="position-indicator" aria-live="polite" aria-label="Current memory">
-    <span id="currentMemory">1</span> / 5
+    <span id="currentMemory">1</span> / 7
   </p>
 
-  <button
-    class="keep-link"
-    id="keepTanzaku"
-    type="button"
-    aria-label="Save current tanzaku image"
-    hidden
-  >
-    keep
-  </button>
-
   <script src="./main.js"></script>
-  <script src="./export.js"></script>
 </body>
 </html>

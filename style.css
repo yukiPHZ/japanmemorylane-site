@@ -80,7 +80,13 @@ button {
 .jp-poem,
 .en-poem,
 .position-indicator,
-.upload-link {
+.upload-link,
+.entry-ja,
+.entry-en,
+.entry-count,
+.journey-gate-ja,
+.journey-gate-en,
+.journey-gate-count {
   margin: 0;
 }
 
@@ -160,17 +166,53 @@ button {
   width: fit-content;
   padding: 0;
   border: 0;
-  border-bottom: 1px solid var(--faint);
   background: transparent;
-  color: rgba(31, 31, 31, 0.48);
   cursor: default;
-  font-size: 11px;
-  line-height: 1.8;
+  color: rgba(31, 31, 31, 0.5);
 }
 
 .upload-link:focus-within {
   outline: 1px solid rgba(31, 31, 31, 0.4);
   outline-offset: 5px;
+}
+
+.journey-entry {
+  display: grid;
+  gap: 8px;
+}
+
+.entry-ja {
+  width: fit-content;
+  color: rgba(31, 31, 31, 0.68);
+  font-family: "Shippori Mincho", "Noto Serif JP", "Yu Mincho",
+    "Hiragino Mincho ProN", "Times New Roman", serif;
+  font-size: 15px;
+  line-height: 1.85;
+  letter-spacing: 0;
+}
+
+.entry-en {
+  color: rgba(31, 31, 31, 0.36);
+  font-size: 10.5px;
+  line-height: 1.65;
+}
+
+.entry-count {
+  color: rgba(31, 31, 31, 0.22);
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 900ms ease;
+}
+
+body.is-choosing-journey .entry-count {
+  opacity: 1;
+}
+
+body.has-journey .site-foot {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 640ms ease;
 }
 
 .quiet-file-input {
@@ -196,56 +238,70 @@ button {
   pointer-events: none;
 }
 
-.keep-link {
+.journey-gate {
   position: fixed;
-  left: max(18px, calc((100vw - 430px) / 2 + 18px));
-  bottom: max(52px, calc((100vh - var(--lane-height)) / 2 + 52px));
-  z-index: 3;
-  padding: 0;
-  border: 0;
-  border-bottom: 1px solid rgba(31, 31, 31, 0.06);
-  background: transparent;
-  color: rgba(31, 31, 31, 0.16);
-  cursor: default;
-  font: inherit;
-  font-size: 10px;
-  line-height: 1.5;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  padding: 48px 28px;
+  background: rgba(246, 244, 239, 0.88);
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
   transition:
-    color 520ms ease,
-    opacity 900ms ease,
-    border-color 520ms ease;
+    background-color 760ms ease,
+    opacity 700ms ease,
+    visibility 700ms ease;
 }
 
-.keep-link[hidden] {
-  display: none;
-}
-
-.keep-link.is-available {
+body.is-choosing-journey .journey-gate,
+body.is-entering-lane .journey-gate {
   opacity: 1;
+  visibility: visible;
   pointer-events: auto;
 }
 
-.keep-link.is-dimmed {
-  color: rgba(31, 31, 31, 0.09);
-  border-bottom-color: rgba(31, 31, 31, 0.04);
+body.is-entering-lane .journey-gate {
+  background: rgba(250, 249, 246, 0.95);
+  pointer-events: none;
 }
 
-.keep-link:hover,
-.keep-link:active,
-.keep-link:focus-visible {
-  color: rgba(31, 31, 31, 0.36);
-  border-bottom-color: rgba(31, 31, 31, 0.14);
+.journey-gate-inner {
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  text-align: center;
 }
 
-.keep-link:focus-visible {
-  outline: 1px solid rgba(31, 31, 31, 0.32);
-  outline-offset: 5px;
+.journey-gate-ja {
+  color: rgba(31, 31, 31, 0.6);
+  font-family: "Shippori Mincho", "Noto Serif JP", "Yu Mincho",
+    "Hiragino Mincho ProN", "Times New Roman", serif;
+  font-size: 18px;
+  line-height: 1.9;
+  transition: opacity 760ms ease;
 }
 
-.keep-link.is-saving {
-  color: rgba(31, 31, 31, 0.12);
+.journey-gate-en {
+  color: rgba(31, 31, 31, 0.28);
+  font-size: 11px;
+  line-height: 1.7;
+  transition: opacity 760ms ease;
+}
+
+.journey-gate-count {
+  position: absolute;
+  right: max(18px, calc((100vw - 430px) / 2 + 18px));
+  bottom: max(28px, calc((100vh - var(--lane-height)) / 2 + 28px));
+  color: rgba(31, 31, 31, 0.18);
+  font-size: 11px;
+  line-height: 1;
+}
+
+body.is-entering-lane .journey-gate-ja,
+body.is-entering-lane .journey-gate-en {
+  opacity: 0.42;
 }
 
 body.js-ready .jp-poem,
