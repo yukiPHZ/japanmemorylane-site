@@ -208,9 +208,123 @@ const readPoemErrorJson = async (response) => {
   }
 };
 
+const getCompressedImageName = (file) => {
+  const baseName = String(file?.name || "compressed")
+    .replace(/\.[^.]+$/, "")
+    .trim();
+  return `${baseName || "compressed"}.jpg`;
+};
+
+const loadImageForCompression = (file) =>
+  new Promise((resolve, reject) => {
+    const imageUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      URL.revokeObjectURL(imageUrl);
+      resolve(image);
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(imageUrl);
+      reject(new Error("Image could not be decoded"));
+    };
+
+    image.decoding = "async";
+    image.src = imageUrl;
+  });
+
+const canvasToJpegBlob = (canvas, quality) =>
+  new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("Canvas could not create a JPEG blob"));
+          return;
+        }
+
+        resolve(blob);
+      },
+      "image/jpeg",
+      quality,
+    );
+  });
+
+const createCompressedImageFile = async (file, index) => {
+  const originalSize = file?.size || 0;
+
+  console.log("image compression started:", {
+    index: index + 1,
+    originalSize,
+  });
+
+  try {
+    const image = await loadImageForCompression(file);
+    const maxSide = 1280;
+    const originalWidth = image.naturalWidth || image.width;
+    const originalHeight = image.naturalHeight || image.height;
+
+    if (!originalWidth || !originalHeight) {
+      throw new Error("Image dimensions were unavailable");
+    }
+
+    const scale = Math.min(1, maxSide / Math.max(originalWidth, originalHeight));
+    const width = Math.max(1, Math.round(originalWidth * scale));
+    const height = Math.max(1, Math.round(originalHeight * scale));
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d", {
+      alpha: false,
+    });
+
+    if (!context) {
+      throw new Error("Canvas context was unavailable");
+    }
+
+    canvas.width = width;
+    canvas.height = height;
+    context.drawImage(image, 0, 0, width, height);
+
+    const targetBytes = 1024 * 1024;
+    let blob = await canvasToJpegBlob(canvas, 0.72);
+
+    if (blob.size > targetBytes) {
+      blob = await canvasToJpegBlob(canvas, 0.66);
+    }
+
+    if (blob.size > targetBytes) {
+      blob = await canvasToJpegBlob(canvas, 0.6);
+    }
+
+    const compressedFile =
+      typeof File === "function"
+        ? new File([blob], getCompressedImageName(file), {
+            type: "image/jpeg",
+            lastModified: Date.now(),
+          })
+        : blob;
+
+    console.log("image compression finished:", {
+      index: index + 1,
+      originalSize,
+      compressedSize: blob.size,
+      width,
+      height,
+    });
+
+    return compressedFile;
+  } catch (error) {
+    console.error("image compression failed:", {
+      index: index + 1,
+      error: error?.message || "unknown",
+    });
+    throw error;
+  }
+};
+
 const requestPoemForCard = async (file, index, requestId) => {
+  const compressedFile = await createCompressedImageFile(file, index);
   const formData = new FormData();
-  formData.append("image", file);
+  formData.append("image", compressedFile);
 
   console.log("poem request started:", index + 1, {
     requestId,

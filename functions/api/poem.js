@@ -305,6 +305,12 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
   }
 
   if (arrayBuffer.byteLength > MAX_IMAGE_BYTES) {
+    console.error("Poem image is too large", {
+      imageType: file?.type || null,
+      imageSize: typeof file?.size === "number" ? file.size : null,
+      imageBytes: arrayBuffer.byteLength,
+      maxImageBytes: MAX_IMAGE_BYTES,
+    });
     throw poemError("invalid_image", "Image is too large", {
       responseStatus: 400,
       diagnosticStatus: 400,
