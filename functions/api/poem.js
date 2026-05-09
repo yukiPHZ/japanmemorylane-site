@@ -81,6 +81,14 @@ Use 1 to 2 short lines.
 Keep it quieter than the Japanese.
 Do not make the English a full caption.
 
+For mood_tags, use lowercase atmosphere tags only.
+Use tags that help arrange a quiet journey from warmer, denser, brighter moments
+toward cooler, softer, more still moments.
+Good tag directions include bright, vivid, crowded, dense, humid, warm, neon,
+busy, calm, serene, reflective, shadow, quiet, distant, soft, rain, empty,
+muted, night, hushed, and still.
+Do not use quality, ranking, tourism, aesthetic, or recommendation tags.
+
 Return only JSON.`;
 
 const jsonHeaders = {

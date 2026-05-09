@@ -23,19 +23,25 @@ const fallbackPoem = {
   japanese: ["……"],
   english: ["……"],
   source: "fallback",
+  moodTags: [],
 };
 
 const journeyState = {
   acceptedFiles: [],
   currentIndex: 0,
   gate: "idle",
+  items: [],
   poems: [],
   ready: false,
   requestId: 0,
+  arranged: false,
+  lastCardReached: false,
+  starShown: false,
 };
 
 let settleTimer;
 let journeyBeforeWordsTimer;
+let journeyStarTimer;
 let poemRequestTimers = [];
 let poemUpdateTimers = [];
 let selectedJourneyPhotoUrls = [];
@@ -85,15 +91,26 @@ const normalizeJourneyPoem = (poem) => {
   const english = Array.isArray(poem?.english)
     ? poem.english
     : splitPoemLines(poem?.english_poem);
+  const moodTags = Array.isArray(poem?.moodTags)
+    ? poem.moodTags
+    : Array.isArray(poem?.mood_tags)
+      ? poem.mood_tags
+      : [];
 
   if (japanese.length === 0 || english.length === 0) {
     return null;
   }
 
+  const normalizedMoodTags = moodTags
+    .map((tag) => String(tag).trim().toLowerCase())
+    .filter(Boolean)
+    .slice(0, 5);
+
   return {
     japanese: japanese.slice(0, 3),
     english: english.slice(0, 2),
-    source: poem?.mood_tags?.includes("fallback") ? "fallback" : "api",
+    moodTags: normalizedMoodTags,
+    source: normalizedMoodTags.includes("fallback") ? "fallback" : "api",
   };
 };
 
@@ -105,7 +122,180 @@ const createBeforeWordsJourneyPoems = () =>
     japanese: [...beforeWords.japanese],
     english: [...beforeWords.english],
     source: "before-words",
+    moodTags: [],
   }));
+
+const heatMoodWeights = {
+  bright: 1,
+  busy: 2,
+  close: 1,
+  colorful: 1,
+  crowded: 2,
+  dense: 2,
+  full: 1,
+  energetic: 2,
+  festive: 2,
+  hot: 1,
+  humid: 1,
+  loud: 1,
+  market: 1,
+  movement: 1,
+  neon: 1,
+  noise: 1,
+  people: 2,
+  red: 1,
+  street: 1,
+  summer: 1,
+  sun: 1,
+  sunlight: 1,
+  traffic: 1,
+  vivid: 2,
+  warm: 1,
+};
+
+const calmMoodWeights = {
+  calm: 2,
+  cold: 1,
+  cool: 1,
+  dim: 1,
+  distant: 1,
+  dusk: 1,
+  empty: 2,
+  evening: 1,
+  far: 1,
+  hushed: 1,
+  low: 1,
+  mist: 1,
+  muted: 1,
+  night: 1,
+  quiet: 2,
+  rain: 1,
+  reflective: 2,
+  serene: 2,
+  shadow: 1,
+  soft: 1,
+  sparse: 1,
+  still: 2,
+  stillness: 2,
+  winter: 1,
+};
+
+const getMoodWeight = (tag, weights) => {
+  const normalizedTag = String(tag || "")
+    .trim()
+    .toLowerCase();
+
+  if (!normalizedTag) {
+    return 0;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(weights, normalizedTag)) {
+    return weights[normalizedTag];
+  }
+
+  return Object.entries(weights).reduce((weight, [keyword, value]) => {
+    if (!normalizedTag.includes(keyword)) {
+      return weight;
+    }
+
+    return Math.max(weight, value);
+  }, 0);
+};
+
+const getJourneyFlowScore = (item) =>
+  (item?.poem?.moodTags || []).reduce(
+    (score, tag) =>
+      score +
+      getMoodWeight(tag, heatMoodWeights) -
+      getMoodWeight(tag, calmMoodWeights),
+    0,
+  );
+
+const orderJourneyItemsByMood = (items) =>
+  items
+    .map((item, originalOrder) => ({
+      flowScore: getJourneyFlowScore(item),
+      item,
+      originalOrder,
+    }))
+    .sort((a, b) => {
+      if (b.flowScore !== a.flowScore) {
+        return b.flowScore - a.flowScore;
+      }
+
+      return a.originalOrder - b.originalOrder;
+    })
+    .map(({ item }) => item);
+
+const clearJourneyStarTimer = () => {
+  window.clearTimeout(journeyStarTimer);
+  journeyStarTimer = undefined;
+};
+
+const removeJourneyStars = () => {
+  document
+    .querySelectorAll(".journey-star")
+    .forEach((star) => star.remove());
+};
+
+const resetJourneyStar = () => {
+  clearJourneyStarTimer();
+  removeJourneyStars();
+  journeyState.lastCardReached = false;
+  journeyState.starShown = false;
+};
+
+const showJourneyStar = () => {
+  if (journeyState.starShown) {
+    return;
+  }
+
+  journeyState.starShown = true;
+
+  const star = document.createElement("span");
+  star.className = "journey-star";
+  star.setAttribute("aria-hidden", "true");
+
+  const removeTimer = window.setTimeout(() => star.remove(), 2600);
+
+  star.addEventListener("animationend", () => {
+    window.clearTimeout(removeTimer);
+    star.remove();
+  }, {
+    once: true,
+  });
+
+  document.body.append(star);
+};
+
+const updateJourneyStarState = () => {
+  if (!journeyState.ready || journeyState.starShown) {
+    clearJourneyStarTimer();
+    return;
+  }
+
+  if (journeyState.currentIndex !== journeyLimit - 1) {
+    clearJourneyStarTimer();
+    return;
+  }
+
+  journeyState.lastCardReached = true;
+
+  if (journeyStarTimer) {
+    return;
+  }
+
+  journeyStarTimer = window.setTimeout(() => {
+    journeyStarTimer = undefined;
+
+    if (
+      journeyState.ready &&
+      journeyState.currentIndex === journeyLimit - 1
+    ) {
+      showJourneyStar();
+    }
+  }, 2100);
+};
 
 const findClosestTanzaku = () => {
   const laneTop = lane.getBoundingClientRect().top;
@@ -135,6 +325,7 @@ const setCurrentTanzaku = (item) => {
   });
 
   console.log("current index", journeyState.currentIndex);
+  updateJourneyStarState();
 };
 
 const markTanzakuSeen = (item) => {
@@ -354,6 +545,7 @@ const requestPoemForCard = async (file, index, requestId) => {
     requestId,
     status: response.status,
     source: poem.source,
+    moodTags: poem.moodTags,
   });
 
   return poem;
@@ -447,6 +639,68 @@ const resetTanzakuReveal = () => {
   });
 };
 
+const renderJourneyItem = (index, journeyItem, logName = "card poem applied") => {
+  const item = tanzakuItems[index];
+  const image = item?.querySelector(".memory-photo img");
+  const japanesePoem = item?.querySelector(".jp-poem");
+  const englishPoem = item?.querySelector(".en-poem");
+  const nextPoem = journeyItem?.poem || fallbackPoem;
+
+  if (!item || !image || !japanesePoem || !englishPoem) {
+    return;
+  }
+
+  if (journeyItem?.photoUrl) {
+    image.src = journeyItem.photoUrl;
+    image.alt = `A quiet moment ${
+      (journeyItem.originalIndex ?? index) + 1
+    } selected for Japan Memory Lane`;
+    image.loading = index === 0 ? "eager" : "lazy";
+  }
+
+  renderPoemLines(japanesePoem, nextPoem.japanese);
+  renderPoemLines(englishPoem, nextPoem.english);
+  item.classList.remove("is-poem-updating");
+
+  console.log(logName, {
+    index: index + 1,
+    originalIndex: (journeyItem?.originalIndex ?? index) + 1,
+    source: nextPoem.source || "api",
+    japanese: nextPoem.japanese.join("\n"),
+    english: nextPoem.english.join("\n"),
+  });
+};
+
+const arrangeJourneyIfReady = () => {
+  if (journeyState.arranged) {
+    return;
+  }
+
+  const journeyItems = journeyState.items.slice(0, journeyLimit);
+
+  if (
+    journeyItems.length < journeyLimit ||
+    journeyItems.some((item) => !item?.settled)
+  ) {
+    return;
+  }
+
+  const orderedItems = orderJourneyItemsByMood(journeyItems);
+  journeyState.arranged = true;
+  journeyState.items = orderedItems;
+  journeyState.poems = orderedItems.map((item) => item.poem || fallbackPoem);
+
+  clearPoemUpdateTimers();
+  orderedItems.forEach((item, index) =>
+    renderJourneyItem(index, item, "journey card arranged"),
+  );
+  updateAfterSettle();
+
+  console.log("journey order arranged", {
+    order: orderedItems.map((item) => (item.originalIndex ?? 0) + 1),
+  });
+};
+
 const updateJourneyCardPoem = (index, poem) => {
   const item = tanzakuItems[index];
   const japanesePoem = item?.querySelector(".jp-poem");
@@ -483,35 +737,25 @@ const createJourneyCards = (poems = journeyState.poems) => {
   clearPoemRequestTimers();
   clearPoemUpdateTimers();
   clearJourneyPhotoUrls();
+  resetJourneyStar();
   resetTanzakuReveal();
+  journeyState.items = [];
+  journeyState.arranged = false;
 
   journeyItems.forEach((file, index) => {
-    const item = tanzakuItems[index];
-    const image = item?.querySelector(".memory-photo img");
-    const japanesePoem = item?.querySelector(".jp-poem");
-    const englishPoem = item?.querySelector(".en-poem");
-
-    if (!item || !image) {
-      return;
-    }
-
     const photoUrl = URL.createObjectURL(file);
     selectedJourneyPhotoUrls.push(photoUrl);
-    image.src = photoUrl;
-    image.alt = `A quiet moment ${index + 1} selected for Japan Memory Lane`;
-    image.loading = index === 0 ? "eager" : "lazy";
-
     const poem = journeyPoems[index] || fallbackPoem;
+    const journeyItem = {
+      file,
+      originalIndex: index,
+      photoUrl,
+      poem,
+      settled: poem.source === "fallback",
+    };
 
-    renderPoemLines(japanesePoem, poem.japanese);
-    renderPoemLines(englishPoem, poem.english);
-
-    console.log("card poem applied", {
-      index: index + 1,
-      source: poem.source || "api",
-      japanese: poem.japanese.join("\n"),
-      english: poem.english.join("\n"),
-    });
+    journeyState.items[index] = journeyItem;
+    renderJourneyItem(index, journeyItem);
   });
 
   journeyState.ready = true;
@@ -557,7 +801,12 @@ const startJourneyPoemRequest = (requestId) => {
             }
 
             journeyState.poems[index] = poem;
+            if (journeyState.items[index]) {
+              journeyState.items[index].poem = poem;
+              journeyState.items[index].settled = true;
+            }
             updateJourneyCardPoem(index, poem);
+            arrangeJourneyIfReady();
           })
           .catch((error) => {
             console.error("poem request failed:", index + 1, {
@@ -570,7 +819,12 @@ const startJourneyPoemRequest = (requestId) => {
             }
 
             journeyState.poems[index] = { ...fallbackPoem };
+            if (journeyState.items[index]) {
+              journeyState.items[index].poem = journeyState.poems[index];
+              journeyState.items[index].settled = true;
+            }
             updateJourneyCardPoem(index, journeyState.poems[index]);
+            arrangeJourneyIfReady();
           });
       }, delayMs);
 
@@ -699,6 +953,8 @@ quietMomentInput?.addEventListener("change", () => {
 window.addEventListener("beforeunload", () => {
   window.clearTimeout(settleTimer);
   window.clearTimeout(journeyBeforeWordsTimer);
+  clearJourneyStarTimer();
+  removeJourneyStars();
   clearPoemRequestTimers();
   clearPoemUpdateTimers();
   clearJourneyPhotoUrls();

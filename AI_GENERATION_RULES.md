@@ -40,6 +40,21 @@ Rules:
 - `english_poem` should contain 1 to 2 lines.
 - `mood_tags` should contain 1 to 5 short lowercase English tags.
 
+## Mood Tags for Journey Flow
+
+`mood_tags` are used only to arrange a quiet flow through seven moments.
+
+They are not quality labels, rankings, recommendations, or aesthetic scores.
+
+Use atmosphere tags that can suggest movement from warmer, denser, brighter moments toward cooler, softer, more still moments.
+
+Good directions include:
+
+- heat: `bright`, `vivid`, `crowded`, `dense`, `humid`, `warm`, `neon`, `busy`
+- calm: `calm`, `serene`, `reflective`, `shadow`, `quiet`, `distant`, `soft`, `rain`, `empty`, `muted`, `night`, `hushed`, `still`
+
+Do not use tags such as `best`, `beautiful`, `recommended`, `must-see`, `perfect`, `aesthetic`, or `favorite`.
+
 ## Image Rules
 
 The model must look at the uploaded image.
