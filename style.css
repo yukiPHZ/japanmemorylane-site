@@ -239,6 +239,8 @@ body.has-journey .site-foot {
 }
 
 .journey-star {
+  --star-pass-x: -66vw;
+  --star-pass-y: 58vh;
   position: fixed;
   top: 13vh;
   right: max(32px, calc((100vw - 430px) / 2 + 38px));
@@ -343,15 +345,25 @@ body.has-journey .site-foot {
 }
 
 body.is-choosing-journey .journey-gate,
-body.is-entering-lane .journey-gate {
+body.is-entering-lane .journey-gate,
+body.is-preparing-journey .journey-gate {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
 }
 
-body.is-entering-lane .journey-gate {
+body.is-entering-lane .journey-gate,
+body.is-preparing-journey .journey-gate {
   background: rgba(250, 249, 246, 0.95);
   pointer-events: none;
+}
+
+body.is-preparing-journey .lane {
+  overflow: hidden;
+}
+
+body.is-preparing-journey .journey-gate {
+  pointer-events: auto;
 }
 
 .journey-gate-inner {
@@ -396,6 +408,16 @@ body.is-entering-lane .journey-gate {
   font-size: 11px;
 }
 
+.journey-gate.is-preparing-path .journey-gate-inner::after {
+  content: "...";
+  color: rgba(31, 31, 31, 0.16);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  line-height: 1;
+  margin-top: 2px;
+  animation: quietPreparingDots 3.8s ease-in-out infinite;
+}
+
 .journey-gate-count {
   position: absolute;
   right: max(18px, calc((100vw - 430px) / 2 + 18px));
@@ -403,6 +425,10 @@ body.is-entering-lane .journey-gate {
   color: rgba(31, 31, 31, 0.18);
   font-size: 11px;
   line-height: 1;
+}
+
+body.is-preparing-journey .journey-gate-count {
+  opacity: 0;
 }
 
 body.is-entering-lane .journey-gate-ja,
@@ -416,6 +442,14 @@ body.is-entering-lane .journey-gate.is-before-words .journey-gate-ja {
 
 body.is-entering-lane .journey-gate.is-before-words .journey-gate-en {
   opacity: 0.38;
+}
+
+body.is-preparing-journey .journey-gate.is-preparing-path .journey-gate-ja {
+  opacity: 0.76;
+}
+
+body.is-preparing-journey .journey-gate.is-preparing-path .journey-gate-en {
+  opacity: 0.32;
 }
 
 body.js-ready .jp-poem,
@@ -545,6 +579,33 @@ body.js-ready .tanzaku.is-poem-waiting.show-english-poem .en-poem {
   }
 }
 
+@media (max-width: 767px) {
+  .journey-star {
+    --star-pass-x: -58vw;
+    --star-pass-y: 52vh;
+    top: 12vh;
+    right: 46px;
+    z-index: 6;
+    width: 7px;
+    height: 7px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow:
+      0 0 8px rgba(255, 255, 255, 0.42),
+      0 0 16px rgba(255, 255, 255, 0.16);
+    filter: blur(0.08px);
+  }
+
+  .journey-star::after {
+    width: 92px;
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.44),
+      rgba(255, 255, 255, 0)
+    );
+    opacity: 0.62;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   body {
     opacity: 1;
@@ -602,7 +663,18 @@ body.js-ready .tanzaku.is-poem-waiting.show-english-poem .en-poem {
 
   100% {
     opacity: 0;
-    transform: translate3d(-66vw, 58vh, 0);
+    transform: translate3d(var(--star-pass-x), var(--star-pass-y), 0);
+  }
+}
+
+@keyframes quietPreparingDots {
+  0%,
+  100% {
+    opacity: 0.12;
+  }
+
+  48% {
+    opacity: 0.3;
   }
 }
 

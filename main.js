@@ -19,6 +19,10 @@ const beforeWords = {
   japanese: ["ことばの前"],
   english: ["before words"],
 };
+const beforePath = {
+  japanese: "巡りの前",
+  english: "before the path",
+};
 const fallbackPoem = {
   japanese: ["……"],
   english: ["……"],
@@ -640,12 +644,12 @@ const waitForBeforeWordsPaint = () =>
   });
 
 const setGateIntro = () => {
-  journeyGate?.classList.remove("is-before-words");
+  journeyGate?.classList.remove("is-before-words", "is-preparing-path");
   renderGateText(journeyIntro);
 };
 
 const showJourneyGate = () => {
-  if (journeyState.ready) {
+  if (journeyState.ready || journeyState.gate === "preparing") {
     return;
   }
 
@@ -663,25 +667,28 @@ const showJourneyGate = () => {
   });
 };
 
-const showBeforeWordsGate = () => {
-  journeyState.gate = "before-words";
-  journeyGate?.classList.add("is-before-words");
-  renderGateText({
-    japanese: beforeWords.japanese.join("\n"),
-    english: beforeWords.english.join("\n"),
-  });
-  document.body.classList.add("is-entering-lane");
+const showPreparingGate = () => {
+  journeyState.gate = "preparing";
+  journeyGate?.classList.add("is-before-words", "is-preparing-path");
+  renderGateText(beforePath);
+  document.body.classList.remove("is-choosing-journey");
+  document.body.classList.add("is-entering-lane", "is-preparing-journey");
+  journeyGate?.setAttribute("aria-hidden", "false");
   setJourneyCount(journeyLimit);
 
   console.log("journey gate shown", {
-    state: "before-words",
+    state: "preparing",
     acceptedFiles: journeyState.acceptedFiles.length,
   });
 };
 
 const hideJourneyGate = () => {
-  document.body.classList.remove("is-choosing-journey", "is-entering-lane");
-  journeyGate?.classList.remove("is-before-words");
+  document.body.classList.remove(
+    "is-choosing-journey",
+    "is-entering-lane",
+    "is-preparing-journey",
+  );
+  journeyGate?.classList.remove("is-before-words", "is-preparing-path");
   journeyGate?.setAttribute("aria-hidden", "true");
   journeyState.gate = "hidden";
 };
@@ -798,8 +805,15 @@ const updateJourneyCardPoem = (index, poem) => {
   poemUpdateTimers.push(timer);
 };
 
-const createJourneyCards = (poems = journeyState.poems) => {
-  const journeyItems = journeyState.acceptedFiles.slice(0, journeyLimit);
+const createJourneyCards = (
+  poems = journeyState.poems,
+  flowOrder = journeyState.flowOrder,
+) => {
+  const journeyFiles = journeyState.acceptedFiles.slice(0, journeyLimit);
+  const displayOrder =
+    Array.isArray(flowOrder) && flowOrder.length === journeyLimit
+      ? flowOrder
+      : journeyFiles.map((_, index) => index);
   const journeyPoems =
     poems.length > 0 ? poems : createBeforeWordsJourneyPoems();
 
@@ -809,19 +823,25 @@ const createJourneyCards = (poems = journeyState.poems) => {
   resetJourneyStar();
   resetTanzakuReveal();
   journeyState.items = [];
-  journeyState.arranged = false;
-  journeyState.flowOrder = [];
+  journeyState.arranged = displayOrder.length === journeyLimit;
+  journeyState.flowOrder = [...displayOrder];
 
-  journeyItems.forEach((file, index) => {
+  displayOrder.forEach((sourceIndex, index) => {
+    const file = journeyFiles[sourceIndex];
+
+    if (!file) {
+      return;
+    }
+
     const photoUrl = URL.createObjectURL(file);
     selectedJourneyPhotoUrls.push(photoUrl);
-    const poem = journeyPoems[index] || fallbackPoem;
+    const poem = journeyPoems[sourceIndex] || fallbackPoem;
     const journeyItem = {
       file,
-      originalIndex: index,
+      originalIndex: sourceIndex,
       photoUrl,
       poem,
-      settled: poem.source === "fallback",
+      settled: true,
     };
 
     journeyState.items[index] = journeyItem;
@@ -840,18 +860,18 @@ const createJourneyCards = (poems = journeyState.poems) => {
   activateFirstCard();
 
   console.log("journey cards created", {
-    count: journeyItems.length,
+    count: displayOrder.length,
   });
 
-  console.log("journey cards shown before api", {
-    count: journeyItems.length,
+  console.log("journey cards shown after api", {
+    count: displayOrder.length,
   });
 };
 
 const startJourneyPoemRequest = (requestId) => {
-  journeyState.acceptedFiles
+  const poemRequests = journeyState.acceptedFiles
     .slice(0, journeyLimit)
-    .forEach((file, index) => {
+    .map((file, index) => {
       const delayMs = index * 1500;
 
       console.log("poem request scheduled:", {
@@ -859,47 +879,73 @@ const startJourneyPoemRequest = (requestId) => {
         delayMs,
       });
 
-      const timer = window.setTimeout(() => {
-        if (requestId !== journeyState.requestId) {
-          return;
-        }
+      return new Promise((resolve) => {
+        const timer = window.setTimeout(() => {
+          if (requestId !== journeyState.requestId) {
+            resolve(null);
+            return;
+          }
 
-        requestPoemForCard(file, index, requestId)
-          .then((poem) => {
-            if (requestId !== journeyState.requestId) {
-              return;
-            }
+          requestPoemForCard(file, index, requestId)
+            .then((poem) => {
+              if (requestId !== journeyState.requestId) {
+                resolve(null);
+                return;
+              }
 
-            journeyState.poems[index] = poem;
-            if (journeyState.items[index]) {
-              journeyState.items[index].poem = poem;
-              journeyState.items[index].settled = true;
-            }
-            updateJourneyCardPoem(index, poem);
-            arrangeJourneyIfReady();
-          })
-          .catch((error) => {
-            console.error("poem request failed:", index + 1, {
-              status: error?.status || error?.detail?.status || null,
-              error: error?.detail || error?.message || "unknown",
+              journeyState.poems[index] = poem;
+              if (journeyState.items[index]) {
+                journeyState.items[index].poem = poem;
+                journeyState.items[index].settled = true;
+              }
+              resolve(poem);
+            })
+            .catch((error) => {
+              console.error("poem request failed:", index + 1, {
+                status: error?.status || error?.detail?.status || null,
+                error: error?.detail || error?.message || "unknown",
+              });
+
+              if (requestId !== journeyState.requestId) {
+                resolve(null);
+                return;
+              }
+
+              journeyState.poems[index] = { ...fallbackPoem };
+              if (journeyState.items[index]) {
+                journeyState.items[index].poem = journeyState.poems[index];
+                journeyState.items[index].settled = true;
+              }
+              resolve(journeyState.poems[index]);
             });
+        }, delayMs);
 
-            if (requestId !== journeyState.requestId) {
-              return;
-            }
-
-            journeyState.poems[index] = { ...fallbackPoem };
-            if (journeyState.items[index]) {
-              journeyState.items[index].poem = journeyState.poems[index];
-              journeyState.items[index].settled = true;
-            }
-            updateJourneyCardPoem(index, journeyState.poems[index]);
-            arrangeJourneyIfReady();
-          });
-      }, delayMs);
-
-      poemRequestTimers.push(timer);
+        poemRequestTimers.push(timer);
+      });
     });
+
+  return Promise.all(poemRequests).then(() => {
+    if (requestId !== journeyState.requestId) {
+      return null;
+    }
+
+    arrangeJourneyIfReady();
+    return journeyState.poems;
+  });
+};
+
+const prepareJourneyItems = () => {
+  journeyState.poems = createFallbackJourneyPoems();
+  journeyState.items = journeyState.acceptedFiles
+    .slice(0, journeyLimit)
+    .map((file, index) => ({
+      file,
+      originalIndex: index,
+      poem: journeyState.poems[index],
+      settled: false,
+    }));
+  journeyState.arranged = false;
+  journeyState.flowOrder = [];
 };
 
 const enterJourneyWhenReady = () => {
@@ -907,10 +953,7 @@ const enterJourneyWhenReady = () => {
     return;
   }
 
-  if (
-    journeyState.gate === "preparing" ||
-    journeyState.gate === "before-words"
-  ) {
+  if (journeyState.gate === "preparing") {
     return;
   }
 
@@ -921,16 +964,21 @@ const enterJourneyWhenReady = () => {
   window.clearTimeout(journeyBeforeWordsTimer);
 
   journeyBeforeWordsTimer = window.setTimeout(async () => {
-    showBeforeWordsGate();
+    showPreparingGate();
     await waitForBeforeWordsPaint();
 
     if (requestId !== journeyState.requestId) {
       return;
     }
 
-    journeyState.poems = createBeforeWordsJourneyPoems();
-    createJourneyCards(journeyState.poems);
-    startJourneyPoemRequest(requestId);
+    prepareJourneyItems();
+    await startJourneyPoemRequest(requestId);
+
+    if (requestId !== journeyState.requestId) {
+      return;
+    }
+
+    createJourneyCards(journeyState.poems, journeyState.flowOrder);
   }, 260);
 };
 
@@ -953,7 +1001,7 @@ const acceptSelectedFiles = (selectedFiles) => {
 };
 
 const handleJourneySelection = (files) => {
-  if (journeyState.ready) {
+  if (journeyState.ready || journeyState.gate === "preparing") {
     return;
   }
 
@@ -1008,7 +1056,7 @@ if (lane) {
 journeyEntry?.addEventListener("click", showJourneyGate);
 
 journeyGate?.addEventListener("click", () => {
-  if (!journeyState.ready && journeyState.gate !== "before-words") {
+  if (!journeyState.ready && journeyState.gate === "selecting") {
     quietMomentInput?.click();
   }
 });
