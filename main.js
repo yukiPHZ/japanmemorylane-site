@@ -37,11 +37,13 @@ const journeyState = {
   arranged: false,
   lastCardReached: false,
   starShown: false,
+  waterShown: false,
 };
 
 let settleTimer;
 let journeyBeforeWordsTimer;
 let journeyStarTimer;
+let journeyWaterTimer;
 let poemRequestTimers = [];
 let poemUpdateTimers = [];
 let selectedJourneyPhotoUrls = [];
@@ -232,17 +234,54 @@ const clearJourneyStarTimer = () => {
   journeyStarTimer = undefined;
 };
 
+const clearJourneyWaterTimer = () => {
+  window.clearTimeout(journeyWaterTimer);
+  journeyWaterTimer = undefined;
+};
+
 const removeJourneyStars = () => {
   document
     .querySelectorAll(".journey-star")
     .forEach((star) => star.remove());
 };
 
+const removeWaterMemories = () => {
+  document
+    .querySelectorAll(".water-memory")
+    .forEach((memory) => memory.remove());
+};
+
 const resetJourneyStar = () => {
   clearJourneyStarTimer();
+  clearJourneyWaterTimer();
   removeJourneyStars();
+  removeWaterMemories();
   journeyState.lastCardReached = false;
   journeyState.starShown = false;
+  journeyState.waterShown = false;
+};
+
+const showWaterMemory = () => {
+  if (journeyState.waterShown) {
+    return;
+  }
+
+  journeyState.waterShown = true;
+
+  const memory = document.createElement("span");
+  memory.className = "water-memory";
+  memory.setAttribute("aria-hidden", "true");
+
+  const removeTimer = window.setTimeout(() => memory.remove(), 4400);
+
+  memory.addEventListener("animationend", () => {
+    window.clearTimeout(removeTimer);
+    memory.remove();
+  }, {
+    once: true,
+  });
+
+  document.body.append(memory);
 };
 
 const showJourneyStar = () => {
@@ -266,6 +305,12 @@ const showJourneyStar = () => {
   });
 
   document.body.append(star);
+
+  clearJourneyWaterTimer();
+  journeyWaterTimer = window.setTimeout(() => {
+    journeyWaterTimer = undefined;
+    showWaterMemory();
+  }, 1450);
 };
 
 const updateJourneyStarState = () => {
@@ -954,7 +999,9 @@ window.addEventListener("beforeunload", () => {
   window.clearTimeout(settleTimer);
   window.clearTimeout(journeyBeforeWordsTimer);
   clearJourneyStarTimer();
+  clearJourneyWaterTimer();
   removeJourneyStars();
+  removeWaterMemories();
   clearPoemRequestTimers();
   clearPoemUpdateTimers();
   clearJourneyPhotoUrls();

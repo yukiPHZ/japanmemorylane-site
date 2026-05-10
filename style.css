@@ -273,6 +273,58 @@ body.has-journey .site-foot {
   transform-origin: left center;
 }
 
+.water-memory {
+  position: fixed;
+  right: 0;
+  bottom: 10vh;
+  left: 0;
+  z-index: 2;
+  height: 22vh;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  filter: blur(0.35px);
+  animation: waterMemoryAppear 3600ms ease-in-out forwards;
+}
+
+.water-memory::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: min(640px, 90vw);
+  height: 100%;
+  border-radius: 50%;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0) 4%,
+      rgba(255, 255, 255, 0.058) 42%,
+      rgba(31, 31, 31, 0.026) 58%,
+      rgba(255, 255, 255, 0) 86%
+    );
+  transform: translateX(-50%) scaleY(0.72);
+}
+
+.water-memory::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 42%;
+  width: min(520px, 76vw);
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0.13),
+    rgba(31, 31, 31, 0.035),
+    rgba(255, 255, 255, 0)
+  );
+  opacity: 0.68;
+  transform: translateX(-50%);
+  animation: waterMemoryLine 3600ms ease-in-out forwards;
+}
+
 .journey-gate {
   position: fixed;
   inset: 0;
@@ -551,5 +603,46 @@ body.js-ready .tanzaku.is-poem-waiting.show-english-poem .en-poem {
   100% {
     opacity: 0;
     transform: translate3d(-68vw, 68vh, 0);
+  }
+}
+
+@keyframes waterMemoryAppear {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 7px, 0) scaleY(0.96);
+  }
+
+  24% {
+    opacity: 1;
+  }
+
+  66% {
+    opacity: 0.78;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -3px, 0) scaleY(1.02);
+  }
+}
+
+@keyframes waterMemoryLine {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(3px) scaleX(0.94);
+  }
+
+  26% {
+    opacity: 0.64;
+  }
+
+  62% {
+    opacity: 0.44;
+    transform: translateX(-50%) translateY(-1px) scaleX(1.04);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px) scaleX(0.98);
   }
 }
