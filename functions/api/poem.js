@@ -55,9 +55,12 @@ Write a short Japanese poem first.
 The Japanese must be natural, quiet, and suitable for vertical writing.
 The Japanese poem will be displayed vertically as a tanzaku.
 Keep visual balance in vertical writing.
-Prefer 2 or 3 balanced short columns.
-Use 2 to 3 short lines unless the image only needs one very small line.
+The Japanese poem must be exactly 3 non-empty lines.
+Use exactly two newline characters in japanese_poem.
+Do not return 1, 2, 4, or more Japanese lines.
 Keep each Japanese line around 6 to 8 characters.
+If the poem feels too long, remove words instead of adding a fourth line.
+Do not put punctuation such as 。 on its own separate line.
 Avoid overly long continuous phrases.
 Avoid repeating connected の phrases such as の...の...の.
 Prioritize empty space over readability.
@@ -190,6 +193,36 @@ const extractResponseText = (responseBody) => {
 
 const visibleLength = (text) => [...text].length;
 
+const isJapanesePunctuationOnly = (line) =>
+  /^[\s\u3000\u3001\u3002\uff0c\uff0e.,。、…!！?？]+$/u.test(
+    String(line || ""),
+  );
+
+const mergePunctuationOnlyLines = (lines) => {
+  const mergedLines = [];
+
+  lines.forEach((rawLine) => {
+    const line = String(rawLine || "").trim();
+
+    if (!line) {
+      return;
+    }
+
+    if (isJapanesePunctuationOnly(line)) {
+      if (mergedLines.length > 0) {
+        mergedLines[mergedLines.length - 1] = `${
+          mergedLines[mergedLines.length - 1]
+        }${line.replace(/\s+/g, "")}`;
+      }
+      return;
+    }
+
+    mergedLines.push(line);
+  });
+
+  return mergedLines;
+};
+
 const findJapaneseBreakIndex = (line) => {
   const characters = [...line];
   const maxIndex = Math.min(JAPANESE_LINE_MAX, characters.length - 1);
@@ -240,23 +273,15 @@ const splitLongJapaneseLine = (line) => {
 };
 
 const balanceJapanesePoem = (poem) => {
-  const originalLines = String(poem || "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const originalLines = mergePunctuationOnlyLines(
+    String(poem || "").split(/\r?\n/),
+  );
 
   const balancedLines = originalLines.flatMap((line) =>
     visibleLength(line) > JAPANESE_LINE_MAX
       ? splitLongJapaneseLine(line)
       : line,
   );
-
-  while (balancedLines.length > 3) {
-    const tail = balancedLines.pop();
-    balancedLines[balancedLines.length - 1] = `${balancedLines[
-      balancedLines.length - 1
-    ]}${tail}`;
-  }
 
   return balancedLines.slice(0, 3).join("\n");
 };

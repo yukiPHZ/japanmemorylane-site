@@ -36,7 +36,10 @@ Rules:
 - Return valid JSON only.
 - Do not wrap the response in Markdown.
 - Do not include explanations.
-- `japanese_poem` should contain 2 to 3 lines by default.
+- `japanese_poem` should contain exactly 3 non-empty lines by default.
+- `japanese_poem` should use exactly two newline characters.
+- `japanese_poem` must not contain 4 or more lines.
+- Punctuation such as `。` must not appear alone on its own line.
 - `english_poem` should contain 1 to 2 lines.
 - `mood_tags` should contain 1 to 5 short lowercase English tags.
 
@@ -185,9 +188,13 @@ Write a short Japanese poem first.
 The Japanese must be natural, quiet, and suitable for vertical writing.
 The Japanese poem will be displayed vertically as a tanzaku.
 Keep visual balance in vertical writing.
-Prefer 2 or 3 balanced short columns.
-Use 2 to 3 short lines unless the image only needs one very small line.
+Use exactly 3 balanced short columns.
+Use exactly 3 non-empty Japanese lines.
+Use exactly two newline characters in `japanese_poem`.
+Do not return 1, 2, 4, or more Japanese lines.
 Keep each Japanese line around 6 to 8 characters.
+If the poem feels too long, remove words instead of adding a fourth line.
+Do not put punctuation such as `。` on its own separate line.
 Avoid overly long continuous phrases.
 Avoid repeating connected の phrases such as の...の...の.
 Prioritize empty space over readability.

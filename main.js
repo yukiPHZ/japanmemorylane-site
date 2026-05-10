@@ -35,6 +35,7 @@ const journeyState = {
   ready: false,
   requestId: 0,
   arranged: false,
+  flowOrder: [],
   lastCardReached: false,
   starShown: false,
   waterShown: false,
@@ -86,10 +87,40 @@ const splitPoemLines = (poem) =>
     .map((line) => line.trim())
     .filter(Boolean);
 
+const isPunctuationOnlyLine = (line) =>
+  /^[\s\u3000\u3001\u3002\uff0c\uff0e.,。、…!！?？]+$/u.test(
+    String(line || ""),
+  );
+
+const normalizeJapanesePoemLines = (lines) => {
+  const normalizedLines = [];
+
+  lines.forEach((rawLine) => {
+    const line = String(rawLine || "").trim();
+
+    if (!line) {
+      return;
+    }
+
+    if (isPunctuationOnlyLine(line)) {
+      if (normalizedLines.length > 0) {
+        normalizedLines[normalizedLines.length - 1] = `${
+          normalizedLines[normalizedLines.length - 1]
+        }${line.replace(/\s+/g, "")}`;
+      }
+      return;
+    }
+
+    normalizedLines.push(line);
+  });
+
+  return normalizedLines.slice(0, 3);
+};
+
 const normalizeJourneyPoem = (poem) => {
-  const japanese = Array.isArray(poem?.japanese)
+  const japanese = normalizeJapanesePoemLines(Array.isArray(poem?.japanese)
     ? poem.japanese
-    : splitPoemLines(poem?.japanese_poem);
+    : splitPoemLines(poem?.japanese_poem));
   const english = Array.isArray(poem?.english)
     ? poem.english
     : splitPoemLines(poem?.english_poem);
@@ -732,17 +763,10 @@ const arrangeJourneyIfReady = () => {
 
   const orderedItems = orderJourneyItemsByMood(journeyItems);
   journeyState.arranged = true;
-  journeyState.items = orderedItems;
-  journeyState.poems = orderedItems.map((item) => item.poem || fallbackPoem);
+  journeyState.flowOrder = orderedItems.map((item) => item.originalIndex);
 
-  clearPoemUpdateTimers();
-  orderedItems.forEach((item, index) =>
-    renderJourneyItem(index, item, "journey card arranged"),
-  );
-  updateAfterSettle();
-
-  console.log("journey order arranged", {
-    order: orderedItems.map((item) => (item.originalIndex ?? 0) + 1),
+  console.log("journey flow prepared", {
+    order: journeyState.flowOrder.map((index) => index + 1),
   });
 };
 
@@ -786,6 +810,7 @@ const createJourneyCards = (poems = journeyState.poems) => {
   resetTanzakuReveal();
   journeyState.items = [];
   journeyState.arranged = false;
+  journeyState.flowOrder = [];
 
   journeyItems.forEach((file, index) => {
     const photoUrl = URL.createObjectURL(file);
