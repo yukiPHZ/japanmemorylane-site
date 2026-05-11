@@ -20,7 +20,7 @@ const beforeWords = {
   english: ["before words"],
 };
 const beforePath = {
-  japanese: "巡りの前",
+  japanese: "\u5de1\u308a\u306e\u524d",
   english: "before the path",
 };
 const fallbackPoem = {
@@ -43,12 +43,14 @@ const journeyState = {
   lastCardReached: false,
   starShown: false,
   waterShown: false,
+  takeOneShown: false,
 };
 
 let settleTimer;
 let journeyBeforeWordsTimer;
 let journeyStarTimer;
 let journeyWaterTimer;
+let takeOneTimer;
 let poemRequestTimers = [];
 let poemUpdateTimers = [];
 let selectedJourneyPhotoUrls = [];
@@ -274,6 +276,11 @@ const clearJourneyWaterTimer = () => {
   journeyWaterTimer = undefined;
 };
 
+const clearTakeOneTimer = () => {
+  window.clearTimeout(takeOneTimer);
+  takeOneTimer = undefined;
+};
+
 const removeJourneyStars = () => {
   document
     .querySelectorAll(".journey-star")
@@ -286,14 +293,272 @@ const removeWaterMemories = () => {
     .forEach((memory) => memory.remove());
 };
 
+const removeTakeOneActions = () => {
+  document
+    .querySelectorAll(".take-one-action")
+    .forEach((action) => action.remove());
+};
+
 const resetJourneyStar = () => {
   clearJourneyStarTimer();
   clearJourneyWaterTimer();
+  clearTakeOneTimer();
   removeJourneyStars();
   removeWaterMemories();
+  removeTakeOneActions();
   journeyState.lastCardReached = false;
   journeyState.starShown = false;
   journeyState.waterShown = false;
+  journeyState.takeOneShown = false;
+};
+
+const getCurrentTanzaku = () =>
+  tanzakuItems[journeyState.currentIndex] || findClosestTanzaku().item;
+
+const getPoemLinesFromElement = (element) => {
+  if (!element) {
+    return [];
+  }
+
+  const lines = [];
+  let currentLine = "";
+
+  element.childNodes.forEach((node) => {
+    if (node.nodeName === "BR") {
+      if (currentLine.trim()) {
+        lines.push(currentLine.trim());
+      }
+      currentLine = "";
+      return;
+    }
+
+    currentLine += node.textContent || "";
+  });
+
+  if (currentLine.trim()) {
+    lines.push(currentLine.trim());
+  }
+
+  return lines;
+};
+
+const waitForImage = (image) =>
+  new Promise((resolve, reject) => {
+    if (!image) {
+      reject(new Error("No image found for export"));
+      return;
+    }
+
+    if (image.complete && image.naturalWidth > 0) {
+      resolve(image);
+      return;
+    }
+
+    image.addEventListener("load", () => resolve(image), { once: true });
+    image.addEventListener(
+      "error",
+      () => reject(new Error("Export image could not be loaded")),
+      { once: true },
+    );
+  });
+
+const drawImageCover = (context, image, x, y, width, height) => {
+  const imageWidth = image.naturalWidth || image.width;
+  const imageHeight = image.naturalHeight || image.height;
+  const scale = Math.max(width / imageWidth, height / imageHeight);
+  const sourceWidth = width / scale;
+  const sourceHeight = height / scale;
+  const sourceX = (imageWidth - sourceWidth) / 2;
+  const sourceY = (imageHeight - sourceHeight) / 2;
+
+  context.drawImage(
+    image,
+    sourceX,
+    sourceY,
+    sourceWidth,
+    sourceHeight,
+    x,
+    y,
+    width,
+    height,
+  );
+};
+
+const drawVerticalPoem = (context, lines, startX, startY) => {
+  const columnGap = 86;
+  const letterGap = 66;
+
+  lines.slice(0, 3).forEach((line, columnIndex) => {
+    [...line].forEach((character, characterIndex) => {
+      context.fillText(
+        character,
+        startX - columnIndex * columnGap,
+        startY + characterIndex * letterGap,
+      );
+    });
+  });
+};
+
+const drawEnglishPoem = (context, lines, x, y) => {
+  const lineHeight = 46;
+
+  lines.slice(0, 2).forEach((line, index) => {
+    context.fillText(line, x, y + index * lineHeight);
+  });
+};
+
+const canvasToPngBlob = (canvas) =>
+  new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("Canvas could not create a PNG blob"));
+        return;
+      }
+
+      resolve(blob);
+    }, "image/png");
+  });
+
+const getExportDateStamp = () => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const downloadBlob = (blob, filename) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+const openBlobInNewTab = (blob) => {
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank", "noopener");
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+};
+
+const shareOrSaveBlob = async (blob, filename) => {
+  const file =
+    typeof File === "function"
+      ? new File([blob], filename, { type: "image/png" })
+      : null;
+
+  if (
+    file &&
+    navigator.canShare &&
+    navigator.canShare({ files: [file] }) &&
+    navigator.share
+  ) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: "Japan Memory Lane",
+      });
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        return;
+      }
+    }
+  }
+
+  try {
+    downloadBlob(blob, filename);
+  } catch (error) {
+    console.error("Take-one download failed", error);
+    openBlobInNewTab(blob);
+  }
+};
+
+const createCurrentTanzakuCanvas = async () => {
+  const item = getCurrentTanzaku();
+  const image = item?.querySelector(".memory-photo img");
+  const japanesePoem = item?.querySelector(".jp-poem");
+  const englishPoem = item?.querySelector(".en-poem");
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+
+  if (!item || !image || !japanesePoem || !englishPoem || !context) {
+    throw new Error("Current tanzaku could not be exported");
+  }
+
+  await waitForImage(image);
+
+  canvas.width = 1080;
+  canvas.height = 1920;
+
+  context.fillStyle = "#f6f4ef";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  drawImageCover(context, image, 96, 330, 560, 700);
+
+  context.fillStyle = "#1f1f1f";
+  context.font =
+    '54px "Shippori Mincho", "Noto Serif JP", "Yu Mincho", serif';
+  context.textBaseline = "top";
+  drawVerticalPoem(context, getPoemLinesFromElement(japanesePoem), 820, 410);
+
+  context.fillStyle = "rgba(31, 31, 31, 0.42)";
+  context.font = '30px Inter, Manrope, "Segoe UI", sans-serif';
+  drawEnglishPoem(context, getPoemLinesFromElement(englishPoem), 96, 1390);
+
+  return canvas;
+};
+
+const exportCurrentTanzaku = async () => {
+  try {
+    const canvas = await createCurrentTanzakuCanvas();
+    const blob = await canvasToPngBlob(canvas);
+    const filename = `japan-memory-lane-${getExportDateStamp()}.png`;
+    await shareOrSaveBlob(blob, filename);
+  } catch (error) {
+    console.error("Take-one export failed", error);
+  }
+};
+
+const showTakeOneAction = () => {
+  if (journeyState.takeOneShown) {
+    return;
+  }
+
+  journeyState.takeOneShown = true;
+
+  const action = document.createElement("button");
+  action.className = "take-one-action";
+  action.type = "button";
+  action.textContent = "\u4e00\u679a\u3060\u3051";
+  action.setAttribute("aria-label", "take one");
+
+  action.addEventListener("click", async () => {
+    action.disabled = true;
+    await exportCurrentTanzaku();
+    action.disabled = false;
+  });
+
+  document.body.append(action);
+};
+
+const scheduleTakeOneAction = () => {
+  if (
+    !journeyState.ready ||
+    !journeyState.lastCardReached ||
+    journeyState.takeOneShown
+  ) {
+    return;
+  }
+
+  clearTakeOneTimer();
+  takeOneTimer = window.setTimeout(() => {
+    takeOneTimer = undefined;
+    showTakeOneAction();
+  }, 1400);
 };
 
 const showWaterMemory = () => {
@@ -307,12 +572,15 @@ const showWaterMemory = () => {
   memory.className = "water-memory";
   memory.setAttribute("aria-hidden", "true");
 
-  const removeTimer = window.setTimeout(() => memory.remove(), 4400);
-
-  memory.addEventListener("animationend", () => {
+  const finishWaterMemory = () => {
     window.clearTimeout(removeTimer);
     memory.remove();
-  }, {
+    scheduleTakeOneAction();
+  };
+
+  const removeTimer = window.setTimeout(finishWaterMemory, 4400);
+
+  memory.addEventListener("animationend", finishWaterMemory, {
     once: true,
   });
 
@@ -1073,8 +1341,10 @@ window.addEventListener("beforeunload", () => {
   window.clearTimeout(journeyBeforeWordsTimer);
   clearJourneyStarTimer();
   clearJourneyWaterTimer();
+  clearTakeOneTimer();
   removeJourneyStars();
   removeWaterMemories();
+  removeTakeOneActions();
   clearPoemRequestTimers();
   clearPoemUpdateTimers();
   clearJourneyPhotoUrls();
