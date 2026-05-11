@@ -44,6 +44,8 @@ const journeyState = {
   starShown: false,
   waterShown: false,
   takeOneShown: false,
+  isTakingOne: false,
+  takeOneCompleted: false,
 };
 
 let settleTimer;
@@ -310,6 +312,8 @@ const resetJourneyStar = () => {
   journeyState.starShown = false;
   journeyState.waterShown = false;
   journeyState.takeOneShown = false;
+  journeyState.isTakingOne = false;
+  journeyState.takeOneCompleted = false;
 };
 
 const getCurrentTanzaku = () =>
@@ -385,8 +389,8 @@ const drawImageCover = (context, image, x, y, width, height) => {
 };
 
 const drawVerticalPoem = (context, lines, startX, startY) => {
-  const columnGap = 90;
-  const letterGap = 67;
+  const columnGap = 92;
+  const letterGap = 68;
 
   lines.slice(0, 3).forEach((line, columnIndex) => {
     [...line].forEach((character, characterIndex) => {
@@ -400,7 +404,7 @@ const drawVerticalPoem = (context, lines, startX, startY) => {
 };
 
 const drawEnglishPoem = (context, lines, x, y) => {
-  const lineHeight = 46;
+  const lineHeight = 48;
 
   lines.slice(0, 2).forEach((line, index) => {
     context.fillText(line, x, y + index * lineHeight);
@@ -436,12 +440,20 @@ const downloadBlob = (blob, filename) => {
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return true;
 };
 
 const openBlobInNewTab = (blob) => {
   const url = URL.createObjectURL(blob);
-  window.open(url, "_blank", "noopener");
+  const openedWindow = window.open(url, "_blank", "noopener");
+
+  if (!openedWindow) {
+    URL.revokeObjectURL(url);
+    return false;
+  }
+
   window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+  return true;
 };
 
 const shareOrSaveBlob = async (blob, filename) => {
@@ -461,19 +473,19 @@ const shareOrSaveBlob = async (blob, filename) => {
         files: [file],
         title: "Japan Memory Lane",
       });
-      return;
+      return true;
     } catch (error) {
       if (error?.name === "AbortError") {
-        return;
+        return false;
       }
     }
   }
 
   try {
-    downloadBlob(blob, filename);
+    return downloadBlob(blob, filename);
   } catch (error) {
     console.error("Take-one download failed", error);
-    openBlobInNewTab(blob);
+    return openBlobInNewTab(blob);
   }
 };
 
@@ -497,17 +509,17 @@ const createCurrentTanzakuCanvas = async () => {
   context.fillStyle = "#f6f4ef";
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  drawImageCover(context, image, 96, 360, 510, 638);
+  drawImageCover(context, image, 112, 390, 470, 588);
 
   context.fillStyle = "rgba(31, 31, 31, 0.96)";
   context.font =
-    '57px "Shippori Mincho", "Noto Serif JP", "Yu Mincho", serif';
+    '58px "Shippori Mincho", "Noto Serif JP", "Yu Mincho", serif';
   context.textBaseline = "top";
-  drawVerticalPoem(context, getPoemLinesFromElement(japanesePoem), 835, 400);
+  drawVerticalPoem(context, getPoemLinesFromElement(japanesePoem), 850, 390);
 
   context.fillStyle = "rgba(31, 31, 31, 0.42)";
   context.font = '30px Inter, Manrope, "Segoe UI", sans-serif';
-  drawEnglishPoem(context, getPoemLinesFromElement(englishPoem), 96, 1385);
+  drawEnglishPoem(context, getPoemLinesFromElement(englishPoem), 112, 1395);
 
   return canvas;
 };
@@ -517,14 +529,15 @@ const exportCurrentTanzaku = async () => {
     const canvas = await createCurrentTanzakuCanvas();
     const blob = await canvasToPngBlob(canvas);
     const filename = `japan-memory-lane-${getExportDateStamp()}.png`;
-    await shareOrSaveBlob(blob, filename);
+    return await shareOrSaveBlob(blob, filename);
   } catch (error) {
     console.error("Take-one export failed", error);
+    return false;
   }
 };
 
 const showTakeOneAction = () => {
-  if (journeyState.takeOneShown) {
+  if (journeyState.takeOneShown || journeyState.takeOneCompleted) {
     return;
   }
 
@@ -537,9 +550,28 @@ const showTakeOneAction = () => {
   action.setAttribute("aria-label", "take one");
 
   action.addEventListener("click", async () => {
+    if (journeyState.isTakingOne || journeyState.takeOneCompleted) {
+      return;
+    }
+
+    journeyState.isTakingOne = true;
     action.disabled = true;
-    await exportCurrentTanzaku();
+    action.classList.add("is-taking-one");
+
+    const completed = await exportCurrentTanzaku();
+
+    journeyState.isTakingOne = false;
+
+    if (completed) {
+      journeyState.takeOneCompleted = true;
+      action.classList.remove("is-taking-one");
+      action.classList.add("is-taken");
+      window.setTimeout(() => action.remove(), 520);
+      return;
+    }
+
     action.disabled = false;
+    action.classList.remove("is-taking-one");
   });
 
   document.body.append(action);

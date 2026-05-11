@@ -210,9 +210,20 @@ body.is-choosing-journey .entry-count {
 }
 
 body.has-journey .site-foot {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 640ms ease;
+  display: none;
+}
+
+body.has-journey .site-head {
+  display: none;
+}
+
+body.has-journey .tanzaku.is-first {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+body.has-journey .tanzaku.is-first .memory {
+  padding-top: 74px;
+  padding-bottom: 74px;
 }
 
 .quiet-file-input {
@@ -359,6 +370,15 @@ body.has-journey .site-foot {
 .take-one-action:disabled {
   color: rgba(31, 31, 31, 0.18);
   cursor: default;
+}
+
+.take-one-action.is-taking-one {
+  opacity: 0.38;
+}
+
+.take-one-action.is-taken {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .journey-gate {
@@ -592,6 +612,11 @@ body.js-ready .tanzaku.is-poem-waiting.show-english-poem .en-poem {
   }
 
   .tanzaku:not(.is-first) .memory {
+    padding-top: 44px;
+    padding-bottom: 50px;
+  }
+
+  body.has-journey .tanzaku.is-first .memory {
     padding-top: 44px;
     padding-bottom: 50px;
   }
