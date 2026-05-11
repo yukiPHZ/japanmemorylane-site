@@ -385,8 +385,8 @@ const drawImageCover = (context, image, x, y, width, height) => {
 };
 
 const drawVerticalPoem = (context, lines, startX, startY) => {
-  const columnGap = 86;
-  const letterGap = 66;
+  const columnGap = 90;
+  const letterGap = 67;
 
   lines.slice(0, 3).forEach((line, columnIndex) => {
     [...line].forEach((character, characterIndex) => {
@@ -497,17 +497,17 @@ const createCurrentTanzakuCanvas = async () => {
   context.fillStyle = "#f6f4ef";
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  drawImageCover(context, image, 96, 330, 560, 700);
+  drawImageCover(context, image, 96, 360, 510, 638);
 
-  context.fillStyle = "#1f1f1f";
+  context.fillStyle = "rgba(31, 31, 31, 0.96)";
   context.font =
-    '54px "Shippori Mincho", "Noto Serif JP", "Yu Mincho", serif';
+    '57px "Shippori Mincho", "Noto Serif JP", "Yu Mincho", serif';
   context.textBaseline = "top";
-  drawVerticalPoem(context, getPoemLinesFromElement(japanesePoem), 820, 410);
+  drawVerticalPoem(context, getPoemLinesFromElement(japanesePoem), 835, 400);
 
   context.fillStyle = "rgba(31, 31, 31, 0.42)";
   context.font = '30px Inter, Manrope, "Segoe UI", sans-serif';
-  drawEnglishPoem(context, getPoemLinesFromElement(englishPoem), 96, 1390);
+  drawEnglishPoem(context, getPoemLinesFromElement(englishPoem), 96, 1385);
 
   return canvas;
 };
