@@ -1,93 +1,54 @@
-# Japan Memory Lane
+# Japan Memory Lane Site
 
-Japan Memory Lane is a quiet static mock for collecting small memories of Japan as vertical poems.
+## サイト役割
 
-This version is not a finished product:
+`japanmemorylane.com` の静かな記憶レーン。写真、縦書きの日本語詩、小さな英語詩を並べ、Japan の小さな記憶を短冊のように残す。
 
-- The front end is static.
-- AI poem generation runs only through Cloudflare Pages Functions.
-- There is no persistent upload storage.
-- There is no login.
-- There is no social sharing.
-- There is no sound or decorative effect.
+## 世界観
 
-## Current State
+観光ガイドでも SNS でも AI ツール画面でもない。狭く静かな路地として、写真と言葉と余白だけで呼吸できる体験を守る。
 
-The site is designed as a mobile-first tanzaku experience. Each screen holds one quiet memory: a photo, a vertical Japanese poem, and a small English poem.
+## 技術構成
 
-It is intended for temporary deployment on Cloudflare Pages.
+- 静的 HTML / CSS / JavaScript
+- Cloudflare Pages Functions: `functions/api/`
+- サイト固有仕様: `SITE_SPEC.md`
+- OpenAI 連携仕様: `AI_CONNECTION_SPEC.md`
+- 生成ルール: `AI_GENERATION_RULES.md`
+- 設定: `package.json`, `wrangler.toml`, `_routes.json`
+- 環境変数: `OPENAI_API_KEY`, 任意で `OPENAI_MODEL`
 
-## Version Notes
+## 触ってよい範囲
 
-- v0.1: First single tanzaku UI mock with one quiet rain-window memory.
-- v0.2: Added five tanzaku memories and vertical scroll-snap paging.
-- v0.3: Adjusted spacing, quietness, English text weight, current-position display, and subtle opacity fade-in.
-- v0.4: Added public-facing metadata, README, and a temporary favicon for static deployment.
-- v0.5: Reduced scroll flicker by preventing repeated image fade triggers.
-- v0.6: Added a quiet local photo-selection mock for the first tanzaku.
-- v0.7: Added temporary predefined poem switching after photo selection.
-- v0.8: Added a pause so poems appear after the selected photo.
-- v0.9: Fixed the future AI poem-generation rules in `AI_GENERATION_RULES.md`.
-- v1.0: Defined the future AI API connection behavior in `AI_CONNECTION_SPEC.md`.
-- v1.1: Added a minimal Cloudflare Pages Function at `functions/api/poem.js` that returns fixed JSON.
-- v1.3: Connected `functions/api/poem.js` to the OpenAI Responses API through Cloudflare environment variables.
-- v1.5: Strengthened image-aware generation so the model uses one visible detail from the uploaded photo instead of generic quiet phrasing.
-- v1.6: Removed the old fixed fallback poem and added trace logs for API output, parsed poems, frontend JSON, and rendered text.
-- v1.7: Split the loading poem from fallback so the waiting state reads as quiet space, not failure.
-- v1.8: Clarified GitHub auto deploy, added source logs for API versus fallback, and softened the waiting text animation.
-- v1.9: Added safe API error diagnostics and `/api/health` for production troubleshooting without exposing secrets.
+- UI 文言、静的メモリー、表示調整
+- `functions/api/` の安全な API 処理
+- AI 生成ルールと接続仕様の明文化
+- README の運用ルール更新
 
-## Thought
+## 触らない範囲
 
-Japan Memory Lane is not a tourism guide, social feed, or AI tool interface. It is a narrow, quiet lane for small remembered moments: photographs, vertical Japanese words, small English echoes, and enough empty space to breathe.
+- API キー、`.env`、秘密情報
+- 画像本文や base64 全体をログに出す変更
+- 本番ドメイン `japanmemorylane.com`
+- Cloudflare Pages Functions を Worker deploy に置き換える変更
 
-## AI Generation Rules
+## deploy手順
 
-AI connection is implemented server-side through Cloudflare Pages Functions.
+1. 変更前にこの README、`SITE_SPEC.md`、`AI_CONNECTION_SPEC.md` を読む。
+2. `git status` で既存変更を確認する。
+3. Functions 変更時は `/api/health` と `/api/poem` の安全な応答を確認する。
+4. `git add . && git commit -m "Update japan memory lane site"`
+5. `git push origin main`
+6. Cloudflare Pages のデプロイ完了と Functions ログを確認する。
 
-- Writing rules are documented in `AI_GENERATION_RULES.md`.
-- API connection behavior is documented in `AI_CONNECTION_SPEC.md`.
-- Uploaded images are read from multipart form data, converted to a base64 data URL, and sent to OpenAI as an `input_image` from `functions/api/poem.js` and `functions/api/journey.js`.
-- Function logs include image type, image bytes, OpenAI status, raw output head, poem lengths, mood tags, and `source` values for API/fallback tracing. API keys, full base64 strings, and image bodies must never be logged.
-- `/api/poem` error responses include safe diagnostic fields: `stage`, `status`, and `message`.
-- `/api/health` returns `{ "ok": true, "hasOpenAiKey": true }` or `{ "ok": true, "hasOpenAiKey": false }`. It never returns the key value.
-
-Required Cloudflare environment variables:
-
-- `OPENAI_API_KEY`: OpenAI API key used only by Cloudflare Pages Functions such as `functions/api/poem.js` and `functions/api/journey.js`.
-- `OPENAI_MODEL`: Optional model override. Defaults to `gpt-4o-mini`.
-
-Do not commit `.env` files or API keys to GitHub.
-
-## Deploy
-
-Cloudflare Pages can serve this folder directly as a static site with Pages Functions.
-
-Production deployment should normally happen through GitHub push auto deploy.
-
-Cloudflare Pages must have Git repository connection enabled for this to work. The connected repository should be the GitHub repository for this project, and pushes to the production branch should trigger Cloudflare Pages builds.
-
-Cloudflare Pages settings:
-
-- Build command: none
-- Build output directory: `/` or `.`
-- Functions directory: `functions/` at the project root
-
-Use manual deploy only when an immediate manual reflection is needed:
+手動反映が必要な場合のみ:
 
 ```bash
 npx wrangler pages deploy . --project-name japanmemorylane-site --branch main
 ```
 
-Do not use `npx wrangler deploy` for this project. That command deploys a Worker and will not enable the `functions/api/poem.js` Pages Functions route.
+## 次にやること
 
-Expected public files:
-
-- `index.html`
-- `style.css`
-- `main.js`
-- `favicon.svg`
-- `assets/`
-- `functions/api/poem.js`
-- `functions/api/health.js`
-- `_routes.json`
+- 本番で `/api/health` を確認する。
+- AI 生成の fallback / source 表示が意図どおりか確認する。
+- ログが秘密情報を含まないことを維持する。
