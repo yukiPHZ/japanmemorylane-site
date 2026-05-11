@@ -456,36 +456,55 @@ const openBlobInNewTab = (blob) => {
   return true;
 };
 
+const logTakeOneShareResult = (method, result, error) => {
+  console.log("take-one share result", {
+    shareMethod: method,
+    shareResult: result,
+    errorName: error?.name || null,
+    takeOneCompleted: journeyState.takeOneCompleted,
+  });
+};
+
 const shareOrSaveBlob = async (blob, filename) => {
   const file =
     typeof File === "function"
       ? new File([blob], filename, { type: "image/png" })
       : null;
-
-  if (
+  const canUseWebShare =
     file &&
-    navigator.canShare &&
-    navigator.canShare({ files: [file] }) &&
-    navigator.share
-  ) {
+    navigator.share &&
+    (!navigator.canShare || navigator.canShare({ files: [file] }));
+
+  if (canUseWebShare) {
     try {
       await navigator.share({
         files: [file],
         title: "Japan Memory Lane",
       });
+      logTakeOneShareResult("web-share", "success");
       return true;
     } catch (error) {
-      if (error?.name === "AbortError") {
+      if (error?.name === "AbortError" || error?.name === "NotAllowedError") {
+        logTakeOneShareResult("web-share", "cancelled", error);
         return false;
       }
+
+      logTakeOneShareResult("web-share", "fallback", error);
     }
   }
 
   try {
-    return downloadBlob(blob, filename);
+    const downloadStarted = downloadBlob(blob, filename);
+    logTakeOneShareResult(
+      "download",
+      downloadStarted ? "success" : "failed",
+    );
+    return downloadStarted;
   } catch (error) {
     console.error("Take-one download failed", error);
-    return openBlobInNewTab(blob);
+    const opened = openBlobInNewTab(blob);
+    logTakeOneShareResult("new-tab", opened ? "success" : "failed", error);
+    return opened;
   }
 };
 
@@ -564,12 +583,18 @@ const showTakeOneAction = () => {
 
     if (completed) {
       journeyState.takeOneCompleted = true;
+      console.log("take-one completed", {
+        takeOneCompleted: journeyState.takeOneCompleted,
+      });
       action.classList.remove("is-taking-one");
       action.classList.add("is-taken");
       window.setTimeout(() => action.remove(), 520);
       return;
     }
 
+    console.log("take-one completed", {
+      takeOneCompleted: journeyState.takeOneCompleted,
+    });
     action.disabled = false;
     action.classList.remove("is-taking-one");
   });
