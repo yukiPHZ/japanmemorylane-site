@@ -89,9 +89,15 @@ const renderGateText = ({ japanese, english }) => {
   }
 };
 
-const splitPoemLines = (poem) =>
+const normalizePoemText = (poem) =>
   String(poem || "")
-    .split(/\r?\n/)
+    .replace(/\r\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .trim();
+
+const splitPoemLines = (poem) =>
+  normalizePoemText(poem)
+    .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
 
@@ -127,10 +133,10 @@ const normalizeJapanesePoemLines = (lines) => {
 
 const normalizeJourneyPoem = (poem) => {
   const japanese = normalizeJapanesePoemLines(Array.isArray(poem?.japanese)
-    ? poem.japanese
+    ? poem.japanese.map(normalizePoemText).flatMap(splitPoemLines)
     : splitPoemLines(poem?.japanese_poem));
   const english = Array.isArray(poem?.english)
-    ? poem.english
+    ? poem.english.map(normalizePoemText).flatMap(splitPoemLines)
     : splitPoemLines(poem?.english_poem);
   const moodTags = Array.isArray(poem?.moodTags)
     ? poem.moodTags
