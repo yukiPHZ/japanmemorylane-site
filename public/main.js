@@ -555,17 +555,17 @@ const createCurrentTanzakuCanvas = async () => {
   context.fillStyle = "#f6f4ef";
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  drawImageCover(context, image, 96, 330, 490, 620);
+  drawImageCover(context, image, 96, 240, 530, 663);
 
   context.fillStyle = "rgba(31, 31, 31, 0.96)";
   context.font =
-    '63px "Shippori Mincho", "Noto Serif JP", "Yu Mincho", serif';
+    '62px "Shippori Mincho", "Noto Serif JP", "Yu Mincho", serif';
   context.textBaseline = "top";
-  drawVerticalPoem(context, getPoemLinesFromElement(japanesePoem), 815, 420);
+  drawVerticalPoem(context, getPoemLinesFromElement(japanesePoem), 830, 360);
 
   context.fillStyle = "rgba(31, 31, 31, 0.42)";
   context.font = '30px Inter, Manrope, "Segoe UI", sans-serif';
-  drawEnglishPoem(context, getPoemLinesFromElement(englishPoem), 96, 1424);
+  drawEnglishPoem(context, getPoemLinesFromElement(englishPoem), 96, 1260);
 
   return canvas;
 };
