@@ -65,3 +65,10 @@ npm run dev
 ```
 
 `npm run deploy` exists as a manual helper only. It is not the default production release path.
+
+## favicon / app icon
+
+- favicon assets: `/assets/favicon/`
+- SVG, ICO, apple-touch-icon, 192px / 512px PNG, and `site.webmanifest` を配置する。
+- HTML head には favicon / apple-touch-icon / manifest / theme-color を設定する。
+- 仮アイコンは後から差し替え可能。小サイズでの識別性と静かな空気感を優先する。
