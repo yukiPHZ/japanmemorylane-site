@@ -44,7 +44,7 @@ Do not write a generic quiet poem.
 Do not reuse prepared-sounding phrases.
 
 Pick exactly one small visual detail from the photo:
-a rope, wet stone, window edge, sign, shadow, rail, step, curtain, reflection,
+a rope, wet step, window edge, sign, shadow, rail, step, curtain, reflection,
 vending-machine button, shrine paper, puddle, leaf, wire, tile, or another visible thing.
 Use that detail indirectly.
 Do not mention everything in the photo.
@@ -88,6 +88,10 @@ The English should support the Japanese, not replace it.
 Use 1 to 2 short lines.
 Keep it quieter than the Japanese.
 Do not make the English a full caption.
+Avoid overusing the word "stone" in English.
+For stone paths, stone steps, or paving, prefer quieter alternatives when natural:
+paved path, old path, temple path, quiet path, sunlit path, steps, or shrine approach.
+Do not force these alternatives if they make the English unnatural.
 
 For mood_tags, use lowercase atmosphere tags only.
 Use tags that help arrange a quiet journey from warmer, denser, brighter moments

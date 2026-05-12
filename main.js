@@ -476,7 +476,34 @@ const openBlobInNewTab = (blob) => {
   return true;
 };
 
+const isLikelyDesktopDevice = () => {
+  const hasFinePointer =
+    window.matchMedia && window.matchMedia("(pointer: fine)").matches;
+  const hasHover =
+    window.matchMedia && window.matchMedia("(hover: hover)").matches;
+  const hasCoarsePointer =
+    window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+  const touchPoints = navigator.maxTouchPoints || 0;
+  const viewportWidth =
+    window.innerWidth || document.documentElement?.clientWidth || 0;
+
+  return (
+    hasFinePointer &&
+    hasHover &&
+    (viewportWidth >= 768 || !hasCoarsePointer || touchPoints <= 1)
+  );
+};
+
 const shareOrSaveBlob = async (blob, filename) => {
+  if (isLikelyDesktopDevice()) {
+    try {
+      return downloadBlob(blob, filename);
+    } catch (error) {
+      console.error("Take-one download failed", error);
+      return openBlobInNewTab(blob);
+    }
+  }
+
   const file =
     typeof File === "function"
       ? new File([blob], filename, { type: "image/png" })
@@ -528,17 +555,17 @@ const createCurrentTanzakuCanvas = async () => {
   context.fillStyle = "#f6f4ef";
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  drawImageCover(context, image, 96, 350, 520, 650);
+  drawImageCover(context, image, 96, 330, 490, 620);
 
   context.fillStyle = "rgba(31, 31, 31, 0.96)";
   context.font =
-    '60px "Shippori Mincho", "Noto Serif JP", "Yu Mincho", serif';
+    '63px "Shippori Mincho", "Noto Serif JP", "Yu Mincho", serif';
   context.textBaseline = "top";
-  drawVerticalPoem(context, getPoemLinesFromElement(japanesePoem), 835, 395);
+  drawVerticalPoem(context, getPoemLinesFromElement(japanesePoem), 815, 420);
 
   context.fillStyle = "rgba(31, 31, 31, 0.42)";
   context.font = '30px Inter, Manrope, "Segoe UI", sans-serif';
-  drawEnglishPoem(context, getPoemLinesFromElement(englishPoem), 96, 1390);
+  drawEnglishPoem(context, getPoemLinesFromElement(englishPoem), 96, 1424);
 
   return canvas;
 };
