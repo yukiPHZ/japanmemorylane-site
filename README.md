@@ -1,54 +1,65 @@
 # Japan Memory Lane Site
 
-## サイト役割
+Quiet Japanese memories, written as vertical poems.
 
-`japanmemorylane.com` の静かな記憶レーン。写真、縦書きの日本語詩、小さな英語詩を並べ、Japan の小さな記憶を短冊のように残す。
+Japan Memory Lane is a small static site for moving through seven quiet moments. It is not a travel guide, not a social feed, and not an AI tool interface. Photos and short vertical poems are kept sparse so the memory has room to breathe.
 
-## 世界観
+## Current Scope
 
-観光ガイドでも SNS でも AI ツール画面でもない。狭く静かな路地として、写真と言葉と余白だけで呼吸できる体験を守る。
-
-## 技術構成
-
-- 静的 HTML / CSS / JavaScript
+- Static frontend: `index.html`, `style.css`, `main.js`
 - Cloudflare Pages Functions: `functions/api/`
-- サイト固有仕様: `SITE_SPEC.md`
-- OpenAI 連携仕様: `AI_CONNECTION_SPEC.md`
-- 生成ルール: `AI_GENERATION_RULES.md`
-- 設定: `package.json`, `wrangler.toml`, `_routes.json`
-- 環境変数: `OPENAI_API_KEY`, 任意で `OPENAI_MODEL`
+- OpenAI generation rules: `AI_GENERATION_RULES.md`
+- API specs: `AI_CONNECTION_SPEC.md`, `SITE_SPEC.md`
+- Environment variables: `OPENAI_API_KEY`, optional `OPENAI_MODEL`
 
-## 触ってよい範囲
+AI is used only to place a small amount of language beside the photo. The browser never receives the OpenAI API key.
 
-- UI 文言、静的メモリー、表示調整
-- `functions/api/` の安全な API 処理
-- AI 生成ルールと接続仕様の明文化
-- README の運用ルール更新
+## Do Not Commit
 
-## 触らない範囲
+- `.env`
+- `.dev.vars`
+- API keys or screenshots containing keys
+- Full base64 image payloads
+- Private Cloudflare or OpenAI credentials
 
-- API キー、`.env`、秘密情報
-- 画像本文や base64 全体をログに出す変更
-- 本番ドメイン `japanmemorylane.com`
-- Cloudflare Pages Functions を Worker deploy に置き換える変更
+## Cloudflare Pages Deployment
 
-## deploy手順
+Production deployment should normally be handled by Cloudflare Pages Git integration:
 
-1. 変更前にこの README、`SITE_SPEC.md`、`AI_CONNECTION_SPEC.md` を読む。
-2. `git status` で既存変更を確認する。
-3. Functions 変更時は `/api/health` と `/api/poem` の安全な応答を確認する。
-4. `git add . && git commit -m "Update japan memory lane site"`
-5. `git push origin main`
-6. Cloudflare Pages のデプロイ完了と Functions ログを確認する。
+1. Commit changes locally.
+2. Push to GitHub with `git push origin main`.
+3. Confirm that Cloudflare Pages Deployments shows the latest commit from `main` as successful.
 
-手動反映が必要な場合のみ:
+Manual deploys are not the normal workflow. Use them only when intentionally doing an emergency/manual reflection and after confirming that this is desired:
 
 ```bash
 npx wrangler pages deploy . --project-name japanmemorylane-site --branch main
 ```
 
-## 次にやること
+For the standard workflow, Cloudflare must have a Git repository connection to `yukiPHZ/japanmemorylane-site`, auto deployments must be enabled for the `main` branch, and the project root must contain:
 
-- 本番で `/api/health` を確認する。
-- AI 生成の fallback / source 表示が意図どおりか確認する。
-- ログが秘密情報を含まないことを維持する。
+- `functions/`
+- `index.html`
+- `style.css`
+- `main.js`
+- `wrangler.toml`
+
+Build command is normally empty. Build output directory is `/` or `.`.
+
+If a pushed commit does not appear in Cloudflare Pages Deployments, check the Cloudflare dashboard before running a manual deploy:
+
+- Pages project Git repository connection
+- Auto deployments setting
+- Production branch set to `main`
+- GitHub installation permissions for the repository
+- Webhook delivery status in GitHub
+- Whether Cloudflare shows a queued, failed, or cancelled deployment
+
+## Local Development
+
+```bash
+npm install
+npm run dev
+```
+
+`npm run deploy` exists as a manual helper only. It is not the default production release path.
