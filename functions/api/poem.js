@@ -61,6 +61,11 @@ Do not return 1, 2, 4, or more Japanese lines.
 Keep each Japanese line around 6 to 8 characters.
 If the poem feels too long, remove words instead of adding a fourth line.
 Do not put punctuation such as 。 on its own separate line.
+Use Japanese only in japanese_poem.
+Do not include English words, romaji, or Latin alphabet characters in japanese_poem.
+Avoid mixed language in japanese_poem.
+Do not put words such as rope, memory, shadow, light, sign, train, or street in japanese_poem.
+If the image includes a Latin-letter sign or brand name, avoid it or describe the detail indirectly in Japanese.
 Avoid overly long continuous phrases.
 Avoid repeating connected の phrases such as の...の...の.
 Prioritize empty space over readability.

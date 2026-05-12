@@ -106,6 +106,14 @@ const isPunctuationOnlyLine = (line) =>
     String(line || ""),
   );
 
+const hasLatinLetters = (line) =>
+  /[A-Za-z\uFF21-\uFF3A\uFF41-\uFF5A]/.test(line);
+const japaneseLineFallbacks = [
+  "\u5c0f\u3055\u306a\u5f71",
+  "\u307e\u3060\u305d\u3053\u306b",
+  "\u6b8b\u3063\u3066\u3044\u305f",
+];
+
 const normalizeJapanesePoemLines = (lines) => {
   const normalizedLines = [];
 
@@ -125,7 +133,13 @@ const normalizeJapanesePoemLines = (lines) => {
       return;
     }
 
-    normalizedLines.push(line);
+    normalizedLines.push(
+      hasLatinLetters(line)
+        ? japaneseLineFallbacks[
+            normalizedLines.length % japaneseLineFallbacks.length
+          ]
+        : line,
+    );
   });
 
   return normalizedLines.slice(0, 3);
@@ -395,8 +409,8 @@ const drawImageCover = (context, image, x, y, width, height) => {
 };
 
 const drawVerticalPoem = (context, lines, startX, startY) => {
-  const columnGap = 92;
-  const letterGap = 68;
+  const columnGap = 86;
+  const letterGap = 66;
 
   lines.slice(0, 3).forEach((line, columnIndex) => {
     [...line].forEach((character, characterIndex) => {
@@ -462,15 +476,6 @@ const openBlobInNewTab = (blob) => {
   return true;
 };
 
-const logTakeOneShareResult = (method, result, error) => {
-  console.log("take-one share result", {
-    shareMethod: method,
-    shareResult: result,
-    errorName: error?.name || null,
-    takeOneCompleted: journeyState.takeOneCompleted,
-  });
-};
-
 const shareOrSaveBlob = async (blob, filename) => {
   const file =
     typeof File === "function"
@@ -487,30 +492,19 @@ const shareOrSaveBlob = async (blob, filename) => {
         files: [file],
         title: "Japan Memory Lane",
       });
-      logTakeOneShareResult("web-share", "success");
       return true;
     } catch (error) {
       if (error?.name === "AbortError" || error?.name === "NotAllowedError") {
-        logTakeOneShareResult("web-share", "cancelled", error);
         return false;
       }
-
-      logTakeOneShareResult("web-share", "fallback", error);
     }
   }
 
   try {
-    const downloadStarted = downloadBlob(blob, filename);
-    logTakeOneShareResult(
-      "download",
-      downloadStarted ? "success" : "failed",
-    );
-    return downloadStarted;
+    return downloadBlob(blob, filename);
   } catch (error) {
     console.error("Take-one download failed", error);
-    const opened = openBlobInNewTab(blob);
-    logTakeOneShareResult("new-tab", opened ? "success" : "failed", error);
-    return opened;
+    return openBlobInNewTab(blob);
   }
 };
 
@@ -534,17 +528,17 @@ const createCurrentTanzakuCanvas = async () => {
   context.fillStyle = "#f6f4ef";
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  drawImageCover(context, image, 112, 390, 470, 588);
+  drawImageCover(context, image, 96, 350, 520, 650);
 
   context.fillStyle = "rgba(31, 31, 31, 0.96)";
   context.font =
-    '58px "Shippori Mincho", "Noto Serif JP", "Yu Mincho", serif';
+    '60px "Shippori Mincho", "Noto Serif JP", "Yu Mincho", serif';
   context.textBaseline = "top";
-  drawVerticalPoem(context, getPoemLinesFromElement(japanesePoem), 850, 390);
+  drawVerticalPoem(context, getPoemLinesFromElement(japanesePoem), 835, 395);
 
   context.fillStyle = "rgba(31, 31, 31, 0.42)";
   context.font = '30px Inter, Manrope, "Segoe UI", sans-serif';
-  drawEnglishPoem(context, getPoemLinesFromElement(englishPoem), 112, 1395);
+  drawEnglishPoem(context, getPoemLinesFromElement(englishPoem), 96, 1390);
 
   return canvas;
 };
@@ -589,18 +583,12 @@ const showTakeOneAction = () => {
 
     if (completed) {
       journeyState.takeOneCompleted = true;
-      console.log("take-one completed", {
-        takeOneCompleted: journeyState.takeOneCompleted,
-      });
       action.classList.remove("is-taking-one");
       action.classList.add("is-taken");
       window.setTimeout(() => action.remove(), 520);
       return;
     }
 
-    console.log("take-one completed", {
-      takeOneCompleted: journeyState.takeOneCompleted,
-    });
     action.disabled = false;
     action.classList.remove("is-taking-one");
   });
