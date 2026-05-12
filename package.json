@@ -1,8 +1,8 @@
 {
   "type": "module",
   "scripts": {
-    "dev": "wrangler pages dev .",
-    "deploy": "wrangler pages deploy . --project-name japanmemorylane-site --branch main"
+    "dev": "wrangler pages dev public",
+    "deploy": "wrangler pages deploy public --project-name japanmemorylane-site --branch main"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"

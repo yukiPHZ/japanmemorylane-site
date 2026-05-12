@@ -6,8 +6,9 @@ Japan Memory Lane is a small static site for moving through seven quiet moments.
 
 ## Current Scope
 
-- Static frontend: `index.html`, `style.css`, `main.js`
+- Static frontend: `public/index.html`, `public/style.css`, `public/main.js`
 - Cloudflare Pages Functions: `functions/api/`
+- Functions routes: `public/_routes.json`
 - OpenAI generation rules: `AI_GENERATION_RULES.md`
 - API specs: `AI_CONNECTION_SPEC.md`, `SITE_SPEC.md`
 - Environment variables: `OPENAI_API_KEY`, optional `OPENAI_MODEL`
@@ -33,18 +34,19 @@ Production deployment should normally be handled by Cloudflare Pages Git integra
 Manual deploys are not the normal workflow. Use them only when intentionally doing an emergency/manual reflection and after confirming that this is desired:
 
 ```bash
-npx wrangler pages deploy . --project-name japanmemorylane-site --branch main
+npx wrangler pages deploy public --project-name japanmemorylane-site --branch main
 ```
 
 For the standard workflow, Cloudflare must have a Git repository connection to `yukiPHZ/japanmemorylane-site`, auto deployments must be enabled for the `main` branch, and the project root must contain:
 
 - `functions/`
-- `index.html`
-- `style.css`
-- `main.js`
+- `public/index.html`
+- `public/style.css`
+- `public/main.js`
+- `public/_routes.json`
 - `wrangler.toml`
 
-Build command is normally empty. Build output directory is `/` or `.`.
+Build command is normally empty. Build output directory is `public`.
 
 If a pushed commit does not appear in Cloudflare Pages Deployments, check the Cloudflare dashboard before running a manual deploy:
 
