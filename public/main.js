@@ -557,10 +557,10 @@ const createCurrentTanzakuCanvas = async () => {
   const photoY = 275;
   const photoW = 390;
   const photoH = 488;
-  const jpX = 815;
-  const jpY = 780;
+  const jpX = 835;
+  const jpY = 460;
   const jpFontSize = 70;
-  const jpColumnGap = 130;
+  const jpColumnGap = 100;
   const jpLetterGap = 69;
   const enX = photoX;
   const enY = 1348;
