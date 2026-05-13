@@ -8,6 +8,20 @@ const journeyGate = document.querySelector("#journeyGate");
 const journeyGateJapanese = document.querySelector("#journeyGateJapanese");
 const journeyGateEnglish = document.querySelector("#journeyGateEnglish");
 const journeyGateCount = document.querySelector("#journeyGateCount");
+const initialTanzakuState = tanzakuItems.map((item) => {
+  const image = item.querySelector(".memory-photo img");
+  const japanesePoem = item.querySelector(".jp-poem");
+  const englishPoem = item.querySelector(".en-poem");
+
+  return {
+    className: item.className,
+    imageSrc: image?.getAttribute("src") || "",
+    imageAlt: image?.getAttribute("alt") || "",
+    imageLoading: image?.getAttribute("loading"),
+    japaneseHtml: japanesePoem?.innerHTML || "",
+    englishHtml: englishPoem?.innerHTML || "",
+  };
+});
 
 const journeyLimit = 7;
 const quietImageExtensions = /\.(jpe?g|png|webp|heic|heif|gif|avif)$/i;
@@ -46,6 +60,8 @@ const journeyState = {
   takeOneShown: false,
   isTakingOne: false,
   takeOneCompleted: false,
+  returnJourneyShown: false,
+  isReturningJourney: false,
 };
 
 let settleTimer;
@@ -53,6 +69,7 @@ let journeyBeforeWordsTimer;
 let journeyStarTimer;
 let journeyWaterTimer;
 let takeOneTimer;
+let returnJourneyTimer;
 let poemRequestTimers = [];
 let poemUpdateTimers = [];
 let selectedJourneyPhotoUrls = [];
@@ -303,6 +320,11 @@ const clearTakeOneTimer = () => {
   takeOneTimer = undefined;
 };
 
+const clearReturnJourneyTimer = () => {
+  window.clearTimeout(returnJourneyTimer);
+  returnJourneyTimer = undefined;
+};
+
 const removeJourneyStars = () => {
   document
     .querySelectorAll(".journey-star")
@@ -321,19 +343,29 @@ const removeTakeOneActions = () => {
     .forEach((action) => action.remove());
 };
 
+const removeReturnJourneyActions = () => {
+  document
+    .querySelectorAll(".return-journey-action")
+    .forEach((action) => action.remove());
+};
+
 const resetJourneyStar = () => {
   clearJourneyStarTimer();
   clearJourneyWaterTimer();
   clearTakeOneTimer();
+  clearReturnJourneyTimer();
   removeJourneyStars();
   removeWaterMemories();
   removeTakeOneActions();
+  removeReturnJourneyActions();
   journeyState.lastCardReached = false;
   journeyState.starShown = false;
   journeyState.waterShown = false;
   journeyState.takeOneShown = false;
   journeyState.isTakingOne = false;
   journeyState.takeOneCompleted = false;
+  journeyState.returnJourneyShown = false;
+  journeyState.isReturningJourney = false;
 };
 
 const getCurrentTanzaku = () =>
@@ -646,6 +678,7 @@ const showTakeOneAction = () => {
       action.classList.remove("is-taking-one");
       action.classList.add("is-taken");
       window.setTimeout(() => action.remove(), 520);
+      scheduleReturnJourneyAction();
       return;
     }
 
@@ -670,6 +703,187 @@ const scheduleTakeOneAction = () => {
     takeOneTimer = undefined;
     showTakeOneAction();
   }, 1400);
+};
+
+const restoreInitialTanzakuContent = () => {
+  tanzakuItems.forEach((item, index) => {
+    const initialState = initialTanzakuState[index];
+    const image = item.querySelector(".memory-photo img");
+    const japanesePoem = item.querySelector(".jp-poem");
+    const englishPoem = item.querySelector(".en-poem");
+
+    if (!initialState) {
+      return;
+    }
+
+    item.className = initialState.className;
+
+    if (image) {
+      image.src = initialState.imageSrc;
+      image.alt = initialState.imageAlt;
+
+      if (initialState.imageLoading) {
+        image.setAttribute("loading", initialState.imageLoading);
+      } else {
+        image.removeAttribute("loading");
+      }
+    }
+
+    if (japanesePoem) {
+      japanesePoem.innerHTML = initialState.japaneseHtml;
+    }
+
+    if (englishPoem) {
+      englishPoem.innerHTML = initialState.englishHtml;
+    }
+  });
+};
+
+const resetJourneyToStart = () => {
+  journeyState.requestId += 1;
+  clearJourneyStarTimer();
+  clearJourneyWaterTimer();
+  clearTakeOneTimer();
+  clearReturnJourneyTimer();
+  clearPoemRequestTimers();
+  clearPoemUpdateTimers();
+  clearJourneyPhotoUrls();
+  removeJourneyStars();
+  removeWaterMemories();
+  removeTakeOneActions();
+  removeReturnJourneyActions();
+
+  journeyState.acceptedFiles = [];
+  journeyState.currentIndex = 0;
+  journeyState.gate = "idle";
+  journeyState.items = [];
+  journeyState.poems = [];
+  journeyState.ready = false;
+  journeyState.arranged = false;
+  journeyState.flowOrder = [];
+  journeyState.lastCardReached = false;
+  journeyState.starShown = false;
+  journeyState.waterShown = false;
+  journeyState.takeOneShown = false;
+  journeyState.isTakingOne = false;
+  journeyState.takeOneCompleted = false;
+  journeyState.returnJourneyShown = false;
+  journeyState.isReturningJourney = false;
+
+  document.body.classList.remove(
+    "has-journey",
+    "is-choosing-journey",
+    "is-entering-lane",
+    "is-preparing-journey",
+    "is-returning-journey",
+  );
+  journeyGate?.classList.remove("is-before-words", "is-preparing-path");
+  journeyGate?.setAttribute("aria-hidden", "true");
+
+  restoreInitialTanzakuContent();
+  setGateIntro();
+  setJourneyCount(0);
+
+  if (quietMomentInput) {
+    quietMomentInput.value = "";
+  }
+
+  if (lane) {
+    lane.scrollTo({ top: 0, behavior: "auto" });
+  }
+
+  setCurrentTanzaku(tanzakuItems[0]);
+  markTanzakuSeen(tanzakuItems[0]);
+};
+
+const showReturnWaterMemory = (onFinish) => {
+  removeWaterMemories();
+
+  const memory = document.createElement("span");
+  memory.className = "water-memory";
+  memory.setAttribute("aria-hidden", "true");
+
+  const finishWaterMemory = () => {
+    window.clearTimeout(removeTimer);
+    memory.remove();
+    onFinish?.();
+  };
+
+  const removeTimer = window.setTimeout(finishWaterMemory, 4400);
+
+  memory.addEventListener("animationend", finishWaterMemory, {
+    once: true,
+  });
+
+  document.body.append(memory);
+};
+
+const returnJourneyToWater = () => {
+  if (journeyState.isReturningJourney) {
+    return;
+  }
+
+  journeyState.isReturningJourney = true;
+  clearReturnJourneyTimer();
+  document.body.classList.add("is-returning-journey");
+
+  const currentTanzaku = getCurrentTanzaku();
+  tanzakuItems.forEach((item) => {
+    item.classList.toggle("is-returning-away", item !== currentTanzaku);
+  });
+
+  window.setTimeout(removeReturnJourneyActions, 900);
+  window.setTimeout(() => {
+    showReturnWaterMemory(resetJourneyToStart);
+  }, 1700);
+};
+
+const showReturnJourneyAction = () => {
+  if (
+    !journeyState.ready ||
+    !journeyState.takeOneCompleted ||
+    journeyState.returnJourneyShown ||
+    journeyState.isReturningJourney
+  ) {
+    return;
+  }
+
+  journeyState.returnJourneyShown = true;
+
+  const action = document.createElement("button");
+  action.className = "return-journey-action";
+  action.type = "button";
+  action.setAttribute("aria-label", "Return to another journey.");
+
+  const japanese = document.createElement("span");
+  japanese.className = "return-journey-ja";
+  japanese.lang = "ja";
+  japanese.textContent = "\u9084\u3059";
+
+  const english = document.createElement("span");
+  english.className = "return-journey-en";
+  english.textContent = "Return to another journey.";
+
+  action.append(japanese, english);
+  action.addEventListener("click", returnJourneyToWater);
+  document.body.append(action);
+};
+
+const scheduleReturnJourneyAction = () => {
+  if (
+    !journeyState.ready ||
+    !journeyState.takeOneCompleted ||
+    journeyState.returnJourneyShown ||
+    journeyState.isReturningJourney
+  ) {
+    return;
+  }
+
+  clearReturnJourneyTimer();
+  returnJourneyTimer = window.setTimeout(() => {
+    returnJourneyTimer = undefined;
+    showReturnJourneyAction();
+  }, 15000);
 };
 
 const showWaterMemory = () => {
@@ -1056,6 +1270,7 @@ const resetTanzakuReveal = () => {
       "is-poem-waiting",
       "is-poem-loading",
       "is-poem-updating",
+      "is-returning-away",
       "show-japanese-poem",
       "show-english-poem",
     );
@@ -1379,9 +1594,11 @@ window.addEventListener("beforeunload", () => {
   clearJourneyStarTimer();
   clearJourneyWaterTimer();
   clearTakeOneTimer();
+  clearReturnJourneyTimer();
   removeJourneyStars();
   removeWaterMemories();
   removeTakeOneActions();
+  removeReturnJourneyActions();
   clearPoemRequestTimers();
   clearPoemUpdateTimers();
   clearJourneyPhotoUrls();
