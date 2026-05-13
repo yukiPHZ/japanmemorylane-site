@@ -72,3 +72,10 @@ npm run dev
 - SVG, ICO, apple-touch-icon, 192px / 512px PNG, and `site.webmanifest` を配置する。
 - HTML head には favicon / apple-touch-icon / manifest / theme-color を設定する。
 - 仮アイコンは後から差し替え可能。小サイズでの識別性と静かな空気感を優先する。
+## sitemap / robots
+
+- 新しい公開HTMLページを追加したら `sitemap.xml` にURLを追加する。
+- 検索に出したくないページは `sitemap.xml` に入れない。
+- `robots.txt` の Sitemap URL が本番ドメインを指しているか確認する。
+- GitHub push後、Cloudflare反映後に `/sitemap.xml` と `/robots.txt` を確認する。
+- 生成する場合は `node scripts/generate-sitemap.js` を実行する。npm build化は不要。
