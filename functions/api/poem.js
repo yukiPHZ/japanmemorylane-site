@@ -89,8 +89,9 @@ Use 1 to 2 short lines.
 Keep it quieter than the Japanese.
 Do not make the English a full caption.
 Avoid overusing the word "stone" in English.
+Avoid phrases such as "whisper from the stone" or "memory in the stone."
 For stone paths, stone steps, or paving, prefer quieter alternatives when natural:
-paved path, old path, temple path, quiet path, sunlit path, steps, or shrine approach.
+paved way, old path, quiet path, shrine path, steps, approach, stillness, or shade.
 Do not force these alternatives if they make the English unnatural.
 
 For mood_tags, use lowercase atmosphere tags only.
@@ -366,13 +367,6 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
     });
   }
 
-  console.log("Japan Memory Lane poem request", {
-    model,
-    imageType: file.type,
-    imageBytes: arrayBuffer.byteLength,
-    imageDetail: IMAGE_DETAIL,
-  });
-
   let imageUrl;
 
   try {
@@ -436,11 +430,6 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
 
   const responseTextBody = await response.text();
 
-  console.log("OpenAI API response status", {
-    status: response.status,
-    ok: response.ok,
-  });
-
   if (!response.ok) {
     console.error("OpenAI API error response", {
       status: response.status,
@@ -468,8 +457,6 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
 
   const responseText = extractResponseText(responseBody);
 
-  console.log("OpenAI raw output head", responseText.slice(0, 1000));
-
   let parsedPoem;
 
   try {
@@ -484,15 +471,6 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
       "OpenAI output text was not valid poem JSON",
     );
   }
-
-  console.log("Parsed Japanese poem", {
-    source: "api",
-    japanese_poem: parsedPoem?.japanese_poem,
-  });
-  console.log("Parsed English poem", {
-    source: "api",
-    english_poem: parsedPoem?.english_poem,
-  });
 
   return validatePoem(parsedPoem);
 };
@@ -528,11 +506,6 @@ export async function onRequest({ request, env }) {
     }
 
     const image = formData.get("image");
-    console.log("Poem form image received", {
-      hasImage: Boolean(image),
-      imageType: image?.type || null,
-      imageSize: typeof image?.size === "number" ? image.size : null,
-    });
 
     if (!isImageFile(image)) {
       console.error("Poem image was missing or unsupported", {
@@ -558,13 +531,6 @@ export async function onRequest({ request, env }) {
       apiKey,
       model: env?.OPENAI_MODEL || DEFAULT_MODEL,
       file: image,
-    });
-
-    console.log("Poem JSON validated", {
-      source: "api",
-      japaneseLength: poem.japanese_poem.length,
-      englishLength: poem.english_poem.length,
-      moodTags: poem.mood_tags,
     });
 
     return json(poem);

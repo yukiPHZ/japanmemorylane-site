@@ -408,10 +408,14 @@ const drawImageCover = (context, image, x, y, width, height) => {
   );
 };
 
-const drawVerticalPoem = (context, lines, startX, startY) => {
-  const columnGap = 86;
-  const letterGap = 66;
-
+const drawVerticalPoem = (
+  context,
+  lines,
+  startX,
+  startY,
+  columnGap,
+  letterGap,
+) => {
   lines.slice(0, 3).forEach((line, columnIndex) => {
     [...line].forEach((character, characterIndex) => {
       context.fillText(
@@ -423,9 +427,7 @@ const drawVerticalPoem = (context, lines, startX, startY) => {
   });
 };
 
-const drawEnglishPoem = (context, lines, x, y) => {
-  const lineHeight = 48;
-
+const drawEnglishPoem = (context, lines, x, y, lineHeight) => {
   lines.slice(0, 2).forEach((line, index) => {
     context.fillText(line, x, y + index * lineHeight);
   });
@@ -549,23 +551,54 @@ const createCurrentTanzakuCanvas = async () => {
 
   await waitForImage(image);
 
-  canvas.width = 1080;
-  canvas.height = 1920;
+  const canvasW = 1080;
+  const canvasH = 1920;
+  const photoX = 132;
+  const photoY = 275;
+  const photoW = 390;
+  const photoH = 488;
+  const jpX = 742;
+  const jpY = 342;
+  const jpFontSize = 58;
+  const jpColumnGap = 82;
+  const jpLetterGap = 64;
+  const enX = photoX;
+  const enY = 1320;
+  const enFontSize = 29;
+  const enLineHeight = 44;
+
+  canvas.width = canvasW;
+  canvas.height = canvasH;
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
 
   context.fillStyle = "#f6f4ef";
-  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillRect(0, 0, canvasW, canvasH);
 
-  drawImageCover(context, image, 96, 240, 530, 663);
+  drawImageCover(context, image, photoX, photoY, photoW, photoH);
 
   context.fillStyle = "rgba(31, 31, 31, 0.96)";
   context.font =
-    '62px "Shippori Mincho", "Noto Serif JP", "Yu Mincho", serif';
+    `${jpFontSize}px "Shippori Mincho", "Noto Serif JP", "Yu Mincho", serif`;
   context.textBaseline = "top";
-  drawVerticalPoem(context, getPoemLinesFromElement(japanesePoem), 830, 360);
+  drawVerticalPoem(
+    context,
+    getPoemLinesFromElement(japanesePoem),
+    jpX,
+    jpY,
+    jpColumnGap,
+    jpLetterGap,
+  );
 
   context.fillStyle = "rgba(31, 31, 31, 0.42)";
-  context.font = '30px Inter, Manrope, "Segoe UI", sans-serif';
-  drawEnglishPoem(context, getPoemLinesFromElement(englishPoem), 96, 1260);
+  context.font = `${enFontSize}px Inter, Manrope, "Segoe UI", sans-serif`;
+  drawEnglishPoem(
+    context,
+    getPoemLinesFromElement(englishPoem),
+    enX,
+    enY,
+    enLineHeight,
+  );
 
   return canvas;
 };
@@ -750,7 +783,6 @@ const setCurrentTanzaku = (item) => {
     tanzaku.classList.toggle("is-current", tanzaku === item);
   });
 
-  console.log("current index", journeyState.currentIndex);
   updateJourneyStarState();
 };
 
@@ -772,9 +804,6 @@ const activateFirstCard = () => {
   setCurrentTanzaku(firstCard);
   markTanzakuSeen(firstCard);
 
-  console.log("first card activated", {
-    currentIndex: journeyState.currentIndex,
-  });
 };
 
 const updateAfterSettle = () => {
@@ -868,13 +897,6 @@ const canvasToJpegBlob = (canvas, quality) =>
   });
 
 const createCompressedImageFile = async (file, index) => {
-  const originalSize = file?.size || 0;
-
-  console.log("image compression started:", {
-    index: index + 1,
-    originalSize,
-  });
-
   try {
     const image = await loadImageForCompression(file);
     const maxSide = 1280;
@@ -920,14 +942,6 @@ const createCompressedImageFile = async (file, index) => {
           })
         : blob;
 
-    console.log("image compression finished:", {
-      index: index + 1,
-      originalSize,
-      compressedSize: blob.size,
-      width,
-      height,
-    });
-
     return compressedFile;
   } catch (error) {
     console.error("image compression failed:", {
@@ -942,10 +956,6 @@ const requestPoemForCard = async (file, index, requestId) => {
   const compressedFile = await createCompressedImageFile(file, index);
   const formData = new FormData();
   formData.append("image", compressedFile);
-
-  console.log("poem request started:", index + 1, {
-    requestId,
-  });
 
   const response = await fetch("/api/poem", {
     method: "POST",
@@ -966,13 +976,6 @@ const requestPoemForCard = async (file, index, requestId) => {
   if (!poem) {
     throw new Error("Poem response was invalid");
   }
-
-  console.log("poem response received:", index + 1, {
-    requestId,
-    status: response.status,
-    source: poem.source,
-    moodTags: poem.moodTags,
-  });
 
   return poem;
 };
@@ -1007,10 +1010,6 @@ const showJourneyGate = () => {
   document.body.classList.add("is-choosing-journey");
   journeyGate?.setAttribute("aria-hidden", "false");
   setJourneyCount(journeyState.acceptedFiles.length);
-
-  console.log("journey gate shown", {
-    acceptedFiles: journeyState.acceptedFiles.length,
-  });
 };
 
 const showPreparingGate = () => {
@@ -1021,11 +1020,6 @@ const showPreparingGate = () => {
   document.body.classList.add("is-entering-lane", "is-preparing-journey");
   journeyGate?.setAttribute("aria-hidden", "false");
   setJourneyCount(journeyLimit);
-
-  console.log("journey gate shown", {
-    state: "preparing",
-    acceptedFiles: journeyState.acceptedFiles.length,
-  });
 };
 
 const hideJourneyGate = () => {
@@ -1068,7 +1062,7 @@ const resetTanzakuReveal = () => {
   });
 };
 
-const renderJourneyItem = (index, journeyItem, logName = "card poem applied") => {
+const renderJourneyItem = (index, journeyItem) => {
   const item = tanzakuItems[index];
   const image = item?.querySelector(".memory-photo img");
   const japanesePoem = item?.querySelector(".jp-poem");
@@ -1090,14 +1084,6 @@ const renderJourneyItem = (index, journeyItem, logName = "card poem applied") =>
   renderPoemLines(japanesePoem, nextPoem.japanese);
   renderPoemLines(englishPoem, nextPoem.english);
   item.classList.remove("is-poem-updating");
-
-  console.log(logName, {
-    index: index + 1,
-    originalIndex: (journeyItem?.originalIndex ?? index) + 1,
-    source: nextPoem.source || "api",
-    japanese: nextPoem.japanese.join("\n"),
-    english: nextPoem.english.join("\n"),
-  });
 };
 
 const arrangeJourneyIfReady = () => {
@@ -1117,10 +1103,6 @@ const arrangeJourneyIfReady = () => {
   const orderedItems = orderJourneyItemsByMood(journeyItems);
   journeyState.arranged = true;
   journeyState.flowOrder = orderedItems.map((item) => item.originalIndex);
-
-  console.log("journey flow prepared", {
-    order: journeyState.flowOrder.map((index) => index + 1),
-  });
 };
 
 const updateJourneyCardPoem = (index, poem) => {
@@ -1139,13 +1121,6 @@ const updateJourneyCardPoem = (index, poem) => {
     renderPoemLines(japanesePoem, nextPoem.japanese);
     renderPoemLines(englishPoem, nextPoem.english);
     item.classList.remove("is-poem-updating");
-
-    console.log("card poem updated", {
-      index: index + 1,
-      source: nextPoem.source || "api",
-      japanese: nextPoem.japanese.join("\n"),
-      english: nextPoem.english.join("\n"),
-    });
   }, 360);
 
   poemUpdateTimers.push(timer);
@@ -1204,14 +1179,6 @@ const createJourneyCards = (
   }
 
   activateFirstCard();
-
-  console.log("journey cards created", {
-    count: displayOrder.length,
-  });
-
-  console.log("journey cards shown after api", {
-    count: displayOrder.length,
-  });
 };
 
 const startJourneyPoemRequest = (requestId) => {
@@ -1219,11 +1186,6 @@ const startJourneyPoemRequest = (requestId) => {
     .slice(0, journeyLimit)
     .map((file, index) => {
       const delayMs = index * 1500;
-
-      console.log("poem request scheduled:", {
-        index: index + 1,
-        delayMs,
-      });
 
       return new Promise((resolve) => {
         const timer = window.setTimeout(() => {
@@ -1339,9 +1301,6 @@ const acceptSelectedFiles = (selectedFiles) => {
     ...journeyState.acceptedFiles,
     ...nextAcceptedFiles,
   ].slice(0, journeyLimit);
-
-  console.log("selected files:", selectedFileList.length);
-  console.log("accepted files:", journeyState.acceptedFiles.length);
 
   setJourneyCount(journeyState.acceptedFiles.length);
 };
