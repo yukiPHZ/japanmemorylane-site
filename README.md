@@ -79,3 +79,24 @@ npm run dev
 - `robots.txt` の Sitemap URL が本番ドメインを指しているか確認する。
 - GitHub push後、Cloudflare反映後に `/sitemap.xml` と `/robots.txt` を確認する。
 - 生成する場合は `node scripts/generate-sitemap.js` を実行する。npm build化は不要。
+
+
+## DAKE_WEB_META
+
+```json
+{
+    "site_key":  "japanmemorylane-site",
+    "display_name":  "Japan Memory Lane",
+    "repo_name":  "japanmemorylane-site",
+    "domain":  "japanmemorylane.com",
+    "cloudflare_project":  "japanmemorylane-site",
+    "site_type":  "functions",
+    "has_functions":  true,
+    "has_openai_api":  true,
+    "health_url":  "https://japanmemorylane.com/api/health",
+    "production_url":  "https://japanmemorylane.com",
+    "status":  "active",
+    "category":  "other",
+    "show_on_dashboard":  true
+}
+```
