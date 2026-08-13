@@ -161,6 +161,69 @@ button {
   padding-top: 26px;
 }
 
+.colophon-link {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  color: rgba(31, 31, 31, 0.34);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+}
+
+.colophon-link:hover,
+.colophon-link:focus-visible {
+  color: rgba(31, 31, 31, 0.66);
+}
+
+body.colophon-page {
+  height: auto;
+  min-height: 100%;
+  overflow: auto;
+}
+
+.colophon {
+  width: min(100% - 48px, 560px);
+  margin: 0 auto;
+  padding: 88px 0 72px;
+}
+
+.colophon .site-name {
+  margin-bottom: 52px;
+}
+
+.colophon h1 {
+  margin: 0 0 42px;
+  font-family: "Shippori Mincho", "Yu Mincho", serif;
+  font-size: clamp(30px, 7vw, 42px);
+  font-weight: 400;
+}
+
+.colophon-copy {
+  display: grid;
+  gap: 22px;
+  color: rgba(31, 31, 31, 0.68);
+  font-size: 14px;
+  line-height: 2;
+}
+
+.colophon-copy p {
+  margin: 0;
+}
+
+.colophon-copy a,
+.colophon-back {
+  color: inherit;
+  text-underline-offset: 4px;
+}
+
+.colophon-back {
+  display: inline-block;
+  margin-top: 54px;
+  color: rgba(31, 31, 31, 0.45);
+  font-size: 12px;
+}
+
 .upload-link {
   display: block;
   width: fit-content;
