@@ -102,6 +102,42 @@ let isSelectingFiles = false;
 let preparedFiles = [];
 const activePoemControllers = new Set();
 const effectTimers = new Set();
+let isProgrammaticLaneJump = false;
+let laneJumpFrame;
+
+const cancelLaneJump = () => {
+  window.cancelAnimationFrame(laneJumpFrame);
+  laneJumpFrame = undefined;
+  isProgrammaticLaneJump = false;
+  lane?.classList.remove("is-instant-jump");
+  document.body.classList.remove("is-resetting-journey");
+};
+
+const beginLaneJump = () => {
+  window.cancelAnimationFrame(laneJumpFrame);
+  window.clearTimeout(settleTimer);
+  isProgrammaticLaneJump = true;
+  lane?.classList.add("is-instant-jump");
+};
+
+const jumpLaneInstantly = (targetTop, onComplete) => {
+  if (!lane) return;
+  beginLaneJump();
+  lane.scrollTop = targetTop;
+  // Commit the destination before restoring snap; CSS auto overrides smooth.
+  void lane.offsetHeight;
+  laneJumpFrame = window.requestAnimationFrame(() => {
+    lane.classList.remove("is-instant-jump");
+    void lane.offsetHeight;
+    // Ignore observer/scroll notifications from both layout changes.
+    laneJumpFrame = window.requestAnimationFrame(() => {
+      laneJumpFrame = undefined;
+      isProgrammaticLaneJump = false;
+      onComplete?.();
+      document.body.classList.remove("is-resetting-journey");
+    });
+  });
+};
 
 const later = (callback, delay) => {
   const requestId = journeyState.requestId;
@@ -140,6 +176,7 @@ const waitQuietly = (delay, signal) => new Promise((resolve, reject) => {
 });
 
 const clearAsyncJourneyWork = () => {
+  cancelLaneJump();
   selectionController?.abort(abortReason("cancelled"));
   generationController?.abort(abortReason("cancelled"));
   activePoemControllers.forEach((controller) => controller.abort(abortReason("cancelled")));
@@ -869,6 +906,8 @@ const restoreInitialTanzakuContent = () => {
 const resetJourneyToStart = () => {
   journeyState.requestId += 1;
   clearAsyncJourneyWork();
+  beginLaneJump();
+  document.body.classList.add("is-resetting-journey");
   clearSampleJourneyBridge();
   preparedFiles = [];
   clearJourneyStarTimer();
@@ -921,12 +960,7 @@ const resetJourneyToStart = () => {
     quietMomentInput.value = "";
   }
 
-  if (lane) {
-    lane.scrollTo({ top: 0, behavior: "auto" });
-  }
-
-  setCurrentTanzaku(tanzakuItems[0]);
-  markTanzakuSeen(tanzakuItems[0]);
+  jumpLaneInstantly(0, activateFirstCard);
 };
 
 const cancelJourneyGate = () => {
@@ -935,11 +969,14 @@ const cancelJourneyGate = () => {
   const fromBridge = opener === sampleJourneyBridge;
   resetJourneyToStart();
   if (fromBridge) {
-    lane.scrollTo({ top: tanzakuItems[6].offsetTop - tanzakuItems[0].offsetTop, behavior: "instant" });
-    setCurrentTanzaku(tanzakuItems[6]);
-    clearSampleJourneyBridge();
-    sampleJourneyBridge.inert = false;
-    sampleJourneyBridge.classList.add("is-visible");
+    jumpLaneInstantly(tanzakuItems[6].offsetTop - tanzakuItems[0].offsetTop, () => {
+      setCurrentTanzaku(tanzakuItems[6]);
+      clearSampleJourneyBridge();
+      sampleJourneyBridge.inert = false;
+      sampleJourneyBridge.classList.add("is-visible");
+      sampleJourneyBridge.focus({ preventScroll: true });
+    });
+    return;
   }
   (opener || journeyEntry)?.focus({ preventScroll: true });
 };
@@ -1178,17 +1215,18 @@ const activateFirstCard = () => {
 };
 
 const updateAfterSettle = () => {
-  if (!lane || tanzakuItems.length === 0) {
+  if (isProgrammaticLaneJump || !lane || tanzakuItems.length === 0) {
     return;
   }
 
   const { item } = findClosestTanzaku();
-  setCurrentTanzaku(item);
+  if (!item.classList.contains("is-current")) setCurrentTanzaku(item);
   markTanzakuSeen(item);
 };
 
 const queueSettleUpdate = () => {
   window.clearTimeout(settleTimer);
+  if (isProgrammaticLaneJump) return;
   settleTimer = window.setTimeout(updateAfterSettle, 180);
 };
 
@@ -1580,6 +1618,7 @@ const createJourneyCards = (
   poems = journeyState.poems,
   flowOrder = journeyState.flowOrder,
 ) => {
+  beginLaneJump();
   const journeyFiles = journeyState.acceptedFiles.slice(0, journeyLimit);
   const displayOrder =
     Array.isArray(flowOrder) && flowOrder.length === journeyLimit
@@ -1624,15 +1663,13 @@ const createJourneyCards = (
 
   journeyState.ready = true;
   document.body.classList.add("has-journey");
-  hideJourneyGate();
   setJourneyCount(journeyLimit);
 
-  if (lane) {
-    lane.scrollTo({ top: 0, behavior: "auto" });
-  }
-
-  activateFirstCard();
-  lane.focus({ preventScroll: true });
+  jumpLaneInstantly(0, () => {
+    activateFirstCard();
+    hideJourneyGate();
+    lane.focus({ preventScroll: true });
+  });
 };
 
 const startJourneyPoemRequest = async (requestId, controller) => {
@@ -1787,12 +1824,14 @@ setJourneyCount(0);
 if ("IntersectionObserver" in window && lane) {
   const observer = new IntersectionObserver(
     (entries) => {
+      if (isProgrammaticLaneJump) return;
       entries.forEach((entry) => {
         if (!entry.isIntersecting || entry.intersectionRatio < 0.72) {
           return;
         }
 
         const item = entry.target;
+        if (item !== findClosestTanzaku().item || item.classList.contains("is-current")) return;
         setCurrentTanzaku(item);
         markTanzakuSeen(item);
       });

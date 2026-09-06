@@ -49,6 +49,34 @@ const select = async (files) => {
 };
 const reset = async (mode) => {
   await page.evaluate((mode) => { resetJourneyToStart(); window.__calls = []; window.__mode = mode; }, mode);
+  await tick(50);
+};
+const traceTransition = () => page.evaluate(() => {
+  window.__transitionFrames = [];
+  const sample = () => {
+    window.__transitionFrames.push({
+      top: lane.scrollTop, index: journeyState.currentIndex,
+      gate: journeyState.gate, ready: journeyState.ready,
+      jumping: isProgrammaticLaneJump,
+    });
+    window.__transitionFrame = requestAnimationFrame(sample);
+  };
+  sample();
+});
+const assertDirectTransition = async () => {
+  const frames = await page.evaluate(() => {
+    cancelAnimationFrame(window.__transitionFrame);
+    return window.__transitionFrames;
+  });
+  assert.ok(frames[0].top > 0, "transition starts at the last card");
+  assert.ok(frames.every((frame) => frame.top === 0 || frame.top === frames[0].top), "no intermediate scroll positions");
+  assert.ok(frames.every((frame) => frame.index === 0 || frame.index === 6), "no intermediate current cards");
+  assert.equal(frames.at(-1).top, 0);
+  assert.equal(frames.at(-1).index, 0);
+  assert.equal(frames.at(-1).jumping, false);
+  assert.equal(await page.evaluate(() => lane.classList.contains("is-instant-jump") || document.body.classList.contains("is-resetting-journey")), false);
+  assert.equal(await page.evaluate(() => getComputedStyle(lane).scrollSnapType), "y mandatory");
+  return frames;
 };
 try {
   await page.goto(baseURL);
@@ -67,6 +95,7 @@ try {
   await page.waitForFunction(() => !isSelectingFiles);
   assert.equal((await state()).count, 3);
   await page.locator("#journeyBack").click();
+  await tick(50);
   assert.equal((await state()).count, 0);
   assert.equal(await page.evaluate(() => window.__urls.size), 0);
   assert.equal(await page.evaluate(() => document.activeElement.id), "sampleJourneyBridge");
@@ -89,11 +118,20 @@ try {
 
   // Staggered starts, optimized reuse, neutral isolated fallback, immutable order.
   await reset("partial");
+  await page.evaluate(() => { lane.scrollTo({ top: lane.scrollHeight, behavior: "instant" }); updateAfterSettle(); });
+  await tick(2400);
+  await traceTransition();
+  const journeyChooser = page.waitForEvent("filechooser");
+  await page.locator("#sampleJourneyBridge").click();
+  await (await journeyChooser).setFiles([]);
   await select([...fixtures, ...fixtures.slice(0, 2)]);
   assert.equal((await state()).count, 7);
   assert.equal((await state()).ready, false);
   await tick(12000);
   assert.equal((await state()).ready, true);
+  const entryFrames = await assertDirectTransition();
+  assert.ok(entryFrames.filter((frame) => frame.ready && frame.gate === "hidden").every((frame) => frame.top === 0), "gate closes only at the first card");
+  assert.equal(await page.evaluate(() => getComputedStyle(lane).scrollBehavior), "smooth");
   assert.equal((await state()).sources.filter((s) => s === "fallback").length, 1);
   const details = await page.evaluate(() => ({
     count: window.__calls.length,
@@ -134,10 +172,38 @@ try {
   assert.equal(await page.locator(".return-journey-action").count(), 1);
   await tick(46000);
   assert.equal((await state()).ready, true);
+  await page.evaluate(() => { lane.scrollTo({ top: lane.scrollHeight, behavior: "instant" }); updateAfterSettle(); });
+  await tick(300);
+  await traceTransition();
   await page.locator(".return-journey-action").click();
   await tick(1300);
+  await assertDirectTransition();
   assert.equal((await state()).ready, false);
   assert.equal(await page.evaluate(() => window.__urls.size), 0);
+
+  // Both atomic scene changes at desktop/mobile widths, with either motion preference.
+  for (const width of [1280, 390]) {
+    for (const reducedMotion of ["no-preference", "reduce"]) {
+      await page.setViewportSize({ width, height: 700 });
+      await page.emulateMedia({ reducedMotion });
+      await reset("success");
+      await page.evaluate(() => { lane.scrollTo({ top: lane.scrollHeight, behavior: "instant" }); updateAfterSettle(); });
+      await tick(200);
+      await traceTransition();
+      await select(fixtures);
+      await tick(12000);
+      await assertDirectTransition();
+      assert.equal(await page.evaluate(() => journeyState.starShown), false);
+      await page.screenshot({ path: `${output}/transition-${width}-${reducedMotion}.png`, animations: "disabled" });
+      await page.evaluate(() => { lane.scrollTo({ top: lane.scrollHeight, behavior: "instant" }); updateAfterSettle(); });
+      await tick(200);
+      await traceTransition();
+      await page.evaluate(() => resetJourneyToStart());
+      await tick(3000);
+      await assertDirectTransition();
+      assert.equal(await page.locator(".journey-star, .water-memory, .take-one-action").count(), 0);
+    }
+  }
 
   // Cancel in-flight generation; no stale work or URLs in the next round.
   await reset("timeout");

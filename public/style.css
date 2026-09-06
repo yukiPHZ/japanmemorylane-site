@@ -54,6 +54,16 @@ button {
   display: none;
 }
 
+.lane.is-instant-jump {
+  scroll-behavior: auto !important;
+  scroll-snap-type: none !important;
+}
+
+body.is-resetting-journey .lane,
+body.is-resetting-journey .position-indicator {
+  visibility: hidden;
+}
+
 .tanzaku {
   min-height: var(--lane-height);
   padding: 28px 26px 24px;
