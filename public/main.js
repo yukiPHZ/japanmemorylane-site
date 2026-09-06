@@ -104,6 +104,58 @@ const activePoemControllers = new Set();
 const effectTimers = new Set();
 let isProgrammaticLaneJump = false;
 let laneJumpFrame;
+let isLaneSceneTransitioning = false;
+let laneSceneTimer;
+let laneSceneVersion = 0;
+
+const cancelLaneScene = () => {
+  window.clearTimeout(laneSceneTimer);
+  laneSceneVersion += 1;
+  isLaneSceneTransitioning = false;
+  document.body.classList.remove(
+    "is-lane-transitioning", "is-lane-fading-out", "is-lane-fading-in",
+    "is-lane-swapping", "is-committing-journey",
+  );
+  document.body.style.removeProperty("--lane-scene-duration");
+};
+
+const transitionLaneScene = (commit, { covered = false, onComplete } = {}) => {
+  cancelLaneScene();
+  const version = laneSceneVersion;
+  const fadeOutMs = reducedMotion() ? 120 : 360;
+  const fadeInMs = reducedMotion() ? 180 : 560;
+  isLaneSceneTransitioning = true;
+  window.clearTimeout(settleTimer);
+  clearSampleJourneyBridge();
+  lane.inert = true;
+  journeyGate.inert = true;
+  document.body.style.setProperty("--lane-scene-duration", `${fadeOutMs}ms`);
+  document.body.classList.add("is-lane-transitioning");
+  if (covered) document.body.classList.add("is-committing-journey");
+  void lane.offsetHeight;
+  document.body.classList.add("is-lane-fading-out");
+
+  // The timer also completes the scene when transitionend is not delivered.
+  laneSceneTimer = window.setTimeout(() => {
+    if (version !== laneSceneVersion) return;
+    document.body.classList.add("is-lane-swapping");
+    void lane.offsetHeight;
+    commit(() => {
+      if (version !== laneSceneVersion) return;
+      document.body.style.setProperty("--lane-scene-duration", `${fadeInMs}ms`);
+      document.body.classList.remove("is-lane-swapping");
+      void lane.offsetHeight;
+      document.body.classList.replace("is-lane-fading-out", "is-lane-fading-in");
+      laneSceneTimer = window.setTimeout(() => {
+        if (version !== laneSceneVersion) return;
+        cancelLaneScene();
+        journeyGate.classList.remove("is-before-words", "is-preparing-path");
+        lane.inert = false;
+        onComplete?.();
+      }, covered ? Math.max(fadeInMs, reducedMotion() ? 150 : 700) : fadeInMs);
+    });
+  }, fadeOutMs);
+};
 
 const cancelLaneJump = () => {
   window.cancelAnimationFrame(laneJumpFrame);
@@ -176,6 +228,7 @@ const waitQuietly = (delay, signal) => new Promise((resolve, reject) => {
 });
 
 const clearAsyncJourneyWork = () => {
+  cancelLaneScene();
   cancelLaneJump();
   selectionController?.abort(abortReason("cancelled"));
   generationController?.abort(abortReason("cancelled"));
@@ -903,9 +956,7 @@ const restoreInitialTanzakuContent = () => {
   });
 };
 
-const resetJourneyToStart = () => {
-  journeyState.requestId += 1;
-  clearAsyncJourneyWork();
+const commitJourneyReset = (onReady, targetIndex) => {
   beginLaneJump();
   document.body.classList.add("is-resetting-journey");
   clearSampleJourneyBridge();
@@ -950,7 +1001,6 @@ const resetJourneyToStart = () => {
   journeyGate?.classList.remove("is-before-words", "is-preparing-path");
   journeyGate?.setAttribute("aria-hidden", "true");
   if (journeyGate) journeyGate.inert = true;
-  if (lane) lane.inert = false;
 
   restoreInitialTanzakuContent();
   setGateIntro();
@@ -960,25 +1010,35 @@ const resetJourneyToStart = () => {
     quietMomentInput.value = "";
   }
 
-  jumpLaneInstantly(0, activateFirstCard);
+  const target = tanzakuItems[targetIndex];
+  jumpLaneInstantly(target.offsetTop - tanzakuItems[0].offsetTop, () => {
+    setCurrentTanzaku(target);
+    markTanzakuSeen(target);
+    onReady();
+  });
+};
+
+const resetJourneyToStart = ({ targetIndex = 0, onComplete } = {}) => {
+  journeyState.requestId += 1;
+  clearAsyncJourneyWork();
+  transitionLaneScene((reveal) => commitJourneyReset(reveal, targetIndex), { onComplete });
 };
 
 const cancelJourneyGate = () => {
   if (!["selecting", "preparing"].includes(journeyState.gate)) return;
   const opener = gateOpener;
   const fromBridge = opener === sampleJourneyBridge;
-  resetJourneyToStart();
-  if (fromBridge) {
-    jumpLaneInstantly(tanzakuItems[6].offsetTop - tanzakuItems[0].offsetTop, () => {
-      setCurrentTanzaku(tanzakuItems[6]);
-      clearSampleJourneyBridge();
-      sampleJourneyBridge.inert = false;
-      sampleJourneyBridge.classList.add("is-visible");
-      sampleJourneyBridge.focus({ preventScroll: true });
-    });
-    return;
-  }
-  (opener || journeyEntry)?.focus({ preventScroll: true });
+  resetJourneyToStart({
+    targetIndex: fromBridge ? 6 : 0,
+    onComplete: () => {
+      if (fromBridge) {
+        clearSampleJourneyBridge();
+        sampleJourneyBridge.inert = false;
+        sampleJourneyBridge.classList.add("is-visible");
+      }
+      (opener || journeyEntry)?.focus({ preventScroll: true });
+    },
+  });
 };
 
 const showReturnWaterMemory = (onFinish) => {
@@ -1013,6 +1073,7 @@ const returnJourneyToWater = () => {
   }
 
   journeyState.isReturningJourney = true;
+  lane.inert = true;
   clearReturnJourneyTimer();
   document.body.classList.add("is-returning-journey");
 
@@ -1215,7 +1276,7 @@ const activateFirstCard = () => {
 };
 
 const updateAfterSettle = () => {
-  if (isProgrammaticLaneJump || !lane || tanzakuItems.length === 0) {
+  if (isLaneSceneTransitioning || isProgrammaticLaneJump || !lane || tanzakuItems.length === 0) {
     return;
   }
 
@@ -1226,7 +1287,7 @@ const updateAfterSettle = () => {
 
 const queueSettleUpdate = () => {
   window.clearTimeout(settleTimer);
-  if (isProgrammaticLaneJump) return;
+  if (isLaneSceneTransitioning || isProgrammaticLaneJump) return;
   settleTimer = window.setTimeout(updateAfterSettle, 180);
 };
 
@@ -1509,13 +1570,11 @@ const showPreparingGate = () => {
 
 const hideJourneyGate = () => {
   journeyGate.inert = true;
-  lane.inert = false;
   document.body.classList.remove(
     "is-choosing-journey",
     "is-entering-lane",
     "is-preparing-journey",
   );
-  journeyGate?.classList.remove("is-before-words", "is-preparing-path");
   journeyGate?.setAttribute("aria-hidden", "true");
   journeyState.gate = "hidden";
 };
@@ -1614,10 +1673,7 @@ const updateJourneyCardPoem = (index, poem) => {
   poemUpdateTimers.push(timer);
 };
 
-const createJourneyCards = (
-  poems = journeyState.poems,
-  flowOrder = journeyState.flowOrder,
-) => {
+const commitJourneyCards = (poems, flowOrder, onReady) => {
   beginLaneJump();
   const journeyFiles = journeyState.acceptedFiles.slice(0, journeyLimit);
   const displayOrder =
@@ -1668,9 +1724,17 @@ const createJourneyCards = (
   jumpLaneInstantly(0, () => {
     activateFirstCard();
     hideJourneyGate();
-    lane.focus({ preventScroll: true });
+    onReady();
   });
 };
+
+const createJourneyCards = (
+  poems = journeyState.poems,
+  flowOrder = journeyState.flowOrder,
+) => transitionLaneScene((reveal) => commitJourneyCards(poems, flowOrder, reveal), {
+  covered: true,
+  onComplete: () => lane.focus({ preventScroll: true }),
+});
 
 const startJourneyPoemRequest = async (requestId, controller) => {
   const { signal } = controller;
@@ -1824,7 +1888,7 @@ setJourneyCount(0);
 if ("IntersectionObserver" in window && lane) {
   const observer = new IntersectionObserver(
     (entries) => {
-      if (isProgrammaticLaneJump) return;
+      if (isLaneSceneTransitioning || isProgrammaticLaneJump) return;
       entries.forEach((entry) => {
         if (!entry.isIntersecting || entry.intersectionRatio < 0.72) {
           return;

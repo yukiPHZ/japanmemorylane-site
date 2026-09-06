@@ -39,6 +39,7 @@ button {
 }
 
 .lane {
+  opacity: 1;
   width: min(100%, 430px);
   height: var(--lane-height);
   margin: 0 auto;
@@ -59,9 +60,36 @@ button {
   scroll-snap-type: none !important;
 }
 
-body.is-resetting-journey .lane,
-body.is-resetting-journey .position-indicator {
-  visibility: hidden;
+body.is-lane-transitioning .lane {
+  transition: opacity var(--lane-scene-duration) ease;
+  pointer-events: none;
+  overflow-y: hidden;
+}
+
+body.is-lane-fading-out .lane {
+  opacity: 0;
+}
+
+body.is-lane-swapping .lane {
+  transition: none;
+}
+
+body.is-lane-transitioning :is(.take-one-action, .return-journey-action,
+  .sample-journey-bridge, .journey-status, .journey-gate-controls) {
+  animation: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+body.is-returning-journey .position-indicator,
+body.is-resetting-journey .position-indicator,
+body.is-lane-transitioning .position-indicator {
+  opacity: 0;
+}
+
+body.is-lane-fading-in .position-indicator {
+  opacity: 1;
+  transition-duration: var(--lane-scene-duration);
 }
 
 .tanzaku {
@@ -329,6 +357,8 @@ body.has-journey .tanzaku.is-first .memory {
 }
 
 .position-indicator {
+  opacity: 1;
+  transition: opacity 300ms ease;
   position: fixed;
   right: max(18px, calc((100vw - 430px) / 2 + 18px));
   bottom: max(18px, calc((100vh - var(--lane-height)) / 2 + 18px));
@@ -567,6 +597,11 @@ body.is-preparing-journey .lane {
 
 body.is-preparing-journey .journey-gate {
   pointer-events: auto;
+}
+
+body.is-committing-journey .journey-gate {
+  background: var(--paper);
+  transition: background-color 360ms ease, opacity 700ms ease, visibility 700ms ease;
 }
 
 .journey-gate-inner {
@@ -1158,6 +1193,10 @@ body.is-returning-journey .return-journey-action { animation: none; }
   .sample-journey-bridge .entry-ja { font-size: 12px; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .position-indicator { transition-duration: 120ms; }
+  body.is-committing-journey .journey-gate {
+    transition: background-color 120ms ease, opacity 150ms linear, visibility 150ms linear;
+  }
   .journey-star, .water-memory { animation: quietMemoryFade 300ms linear forwards; filter: none; transform: none; }
   .journey-star::after { display: none; }
   .water-memory::after { animation: none; }

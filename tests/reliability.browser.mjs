@@ -49,7 +49,7 @@ const select = async (files) => {
 };
 const reset = async (mode) => {
   await page.evaluate((mode) => { resetJourneyToStart(); window.__calls = []; window.__mode = mode; }, mode);
-  await tick(50);
+  await tick(1200);
 };
 const traceTransition = () => page.evaluate(() => {
   window.__transitionFrames = [];
@@ -95,7 +95,7 @@ try {
   await page.waitForFunction(() => !isSelectingFiles);
   assert.equal((await state()).count, 3);
   await page.locator("#journeyBack").click();
-  await tick(50);
+  await tick(1200);
   assert.equal((await state()).count, 0);
   assert.equal(await page.evaluate(() => window.__urls.size), 0);
   assert.equal(await page.evaluate(() => document.activeElement.id), "sampleJourneyBridge");
@@ -105,6 +105,7 @@ try {
   assert.match(await page.locator("#journeyStatus").textContent(), /別の一枚を/);
   await page.screenshot({ path: `${output}/invalid-390.png`, animations: "disabled" });
   await page.keyboard.press("Escape");
+  await tick(1200);
   assert.equal((await state()).gate, "idle");
 
   // No new picker on the handling link; keyboard focus remains inside the gate.
