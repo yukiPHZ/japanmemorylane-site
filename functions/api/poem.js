@@ -204,7 +204,7 @@ const extractResponseText = (responseBody) => {
 const visibleLength = (text) => [...text].length;
 
 const isJapanesePunctuationOnly = (line) =>
-  /^[\s\u3000\u3001\u3002\uff0c\uff0e.,。、…!！?？]+$/u.test(
+  /^[\p{P}\p{S}\s]+$/u.test(
     String(line || ""),
   );
 
@@ -293,7 +293,7 @@ const balanceJapanesePoem = (poem) => {
       : line,
   );
 
-  return balancedLines.slice(0, 3).join("\n");
+  return balancedLines.join("\n");
 };
 
 const validatePoem = (poem) => {
@@ -302,21 +302,21 @@ const validatePoem = (poem) => {
       ? balanceJapanesePoem(poem.japanese_poem)
       : poem?.japanese_poem;
   const englishPoem = poem?.english_poem;
-  const moodTags = Array.isArray(poem?.mood_tags)
-    ? poem.mood_tags
-        .filter((tag) => typeof tag === "string")
-        .map((tag) => tag.trim())
-        .filter(Boolean)
-        .slice(0, 5)
-    : null;
+  const moodTags = poem?.mood_tags;
+  const japaneseLines = typeof japanesePoem === "string"
+    ? japanesePoem.split("\n").map((line) => line.trim()).filter(Boolean)
+    : [];
 
   if (
     typeof japanesePoem !== "string" ||
+    japaneseLines.length !== 3 ||
+    japaneseLines.some((line) => isJapanesePunctuationOnly(line) || visibleLength(line) > JAPANESE_LINE_MAX || /\p{Script=Latin}/u.test(line)) ||
     typeof englishPoem !== "string" ||
-    !moodTags ||
+    !englishPoem.trim() ||
+    !Array.isArray(moodTags) ||
     moodTags.length < 1 ||
     moodTags.length > 5 ||
-    !moodTags.every((tag) => typeof tag === "string")
+    !moodTags.every((tag) => typeof tag === "string" && /^[a-z][a-z -]{0,39}$/.test(tag.trim()))
   ) {
     throw poemError(
       "schema_validation",
@@ -327,7 +327,7 @@ const validatePoem = (poem) => {
   return {
     japanese_poem: japanesePoem.trim(),
     english_poem: englishPoem.trim(),
-    mood_tags: moodTags,
+    mood_tags: moodTags.map((tag) => tag.trim()),
   };
 };
 
@@ -339,7 +339,6 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
   } catch (error) {
     console.error("Poem image arrayBuffer failed", {
       imageType: file?.type || null,
-      message: error?.message,
     });
     throw poemError("invalid_image", "Image could not be read", {
       responseStatus: 400,
@@ -375,7 +374,6 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
     console.error("Poem image base64 conversion failed", {
       imageType: file?.type || null,
       imageBytes: arrayBuffer.byteLength,
-      message: error?.message,
     });
     throw poemError("invalid_image", "Image could not be encoded", {
       responseStatus: 400,
@@ -422,9 +420,7 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
       }),
     });
   } catch (error) {
-    console.error("OpenAI request network error", {
-      message: error?.message,
-    });
+    console.error("OpenAI request network error");
     throw poemError("openai_request", "OpenAI API request failed");
   }
 
@@ -433,7 +429,6 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
   if (!response.ok) {
     console.error("OpenAI API error response", {
       status: response.status,
-      bodyHead: responseTextBody.slice(0, 1000),
     });
     throw poemError("openai_request", "OpenAI API request failed", {
       diagnosticStatus: response.status,
@@ -445,10 +440,7 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
   try {
     responseBody = JSON.parse(responseTextBody);
   } catch (error) {
-    console.error("OpenAI response JSON parse failed", {
-      message: error?.message,
-      bodyHead: responseTextBody.slice(0, 1000),
-    });
+    console.error("OpenAI response JSON parse failed");
     throw poemError(
       "openai_response_parse",
       "OpenAI API response was not valid JSON",
@@ -462,10 +454,7 @@ const requestOpenAIPoem = async ({ apiKey, model, file }) => {
   try {
     parsedPoem = JSON.parse(responseText);
   } catch (error) {
-    console.error("OpenAI output JSON parse failed", {
-      message: error?.message,
-      outputHead: responseText.slice(0, 1000),
-    });
+    console.error("OpenAI output JSON parse failed");
     throw poemError(
       "openai_response_parse",
       "OpenAI output text was not valid poem JSON",
@@ -496,8 +485,6 @@ export async function onRequest({ request, env }) {
       formData = await request.formData();
     } catch (error) {
       console.error("Poem multipart formData failed", {
-        contentTypeHead: contentType.slice(0, 80),
-        message: error?.message,
       });
       throw poemError("invalid_image", "Multipart form data could not be read", {
         responseStatus: 400,
@@ -539,8 +526,6 @@ export async function onRequest({ request, env }) {
       source: "api_error",
       stage: error?.stage || "unknown",
       status: error?.diagnosticStatus || 500,
-      message: error?.message,
-      stack: error?.stack,
     });
     return errorResponse(error);
   }

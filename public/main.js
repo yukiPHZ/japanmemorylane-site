@@ -8,6 +8,15 @@ const journeyGate = document.querySelector("#journeyGate");
 const journeyGateJapanese = document.querySelector("#journeyGateJapanese");
 const journeyGateEnglish = document.querySelector("#journeyGateEnglish");
 const journeyGateCount = document.querySelector("#journeyGateCount");
+const journeyBack = document.querySelector("#journeyBack");
+const journeyPick = document.querySelector("#journeyPick");
+const journeyStatus = document.querySelector("#journeyStatus");
+const sampleJourneyBridge = document.querySelector("#sampleJourneyBridge");
+const POEM_REQUEST_TIMEOUT_MS = 16000;
+const JOURNEY_GENERATION_DEADLINE_MS = 30000;
+const POEM_RETRY_DELAY_MS = 800;
+const SAMPLE_BRIDGE_DELAY_MS = 1800;
+const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const initialTanzakuState = tanzakuItems.map((item) => {
   const image = item.querySelector(".memory-photo img");
   const japanesePoem = item.querySelector(".jp-poem");
@@ -37,12 +46,21 @@ const beforePath = {
   japanese: "\u5de1\u308a\u306e\u524d",
   english: "before the path",
 };
-const fallbackPoem = {
-  japanese: ["……"],
-  english: ["……"],
+const fallbackPoems = [
+  ["この一枚\nまだことばの\n前にいる", "Still here,\nbefore words."],
+  ["名のないまま\nひとつの景色\nここにある", "Unnamed,\nthe view remains."],
+  ["見えたもの\nまだそのまま\nここにいる", "As it appeared,\nit stays."],
+  ["ひとつだけ\nことばの外に\n置いておく", "One moment,\noutside words."],
+  ["目の前に\nまだ名のない\n景色だけ", "Before a name,\nonly the view."],
+  ["写ったまま\nことばを持たず\nここにある", "As it was caught,\nwithout words."],
+  ["この景色\nまだ何も言わず\n残っている", "This view\nsays nothing yet."],
+];
+const getFallbackPoem = (index = 0) => ({
+  japanese: fallbackPoems[index % journeyLimit][0].split("\n"),
+  english: fallbackPoems[index % journeyLimit][1].split("\n"),
   source: "fallback",
-  moodTags: [],
-};
+  moodTags: ["fallback"],
+});
 
 const journeyState = {
   acceptedFiles: [],
@@ -60,6 +78,7 @@ const journeyState = {
   takeOneShown: false,
   isTakingOne: false,
   takeOneCompleted: false,
+  keptIndex: null,
   returnJourneyShown: false,
   isReturningJourney: false,
 };
@@ -73,6 +92,106 @@ let returnJourneyTimer;
 let poemRequestTimers = [];
 let poemUpdateTimers = [];
 let selectedJourneyPhotoUrls = [];
+let sampleJourneyBridgeTimer;
+let statusMessageTimer;
+let generationDeadlineTimer;
+let generationController;
+let selectionController;
+let gateOpener;
+let isSelectingFiles = false;
+let preparedFiles = [];
+const activePoemControllers = new Set();
+const effectTimers = new Set();
+
+const later = (callback, delay) => {
+  const requestId = journeyState.requestId;
+  const timer = window.setTimeout(() => {
+    effectTimers.delete(timer);
+    if (requestId === journeyState.requestId) callback();
+  }, delay);
+  effectTimers.add(timer);
+  return timer;
+};
+
+const abortReason = (stage) => Object.assign(new Error(stage), { stage });
+
+// Race even response-body reads against cancellation, and always remove listeners.
+const withAbort = (promise, signal) => new Promise((resolve, reject) => {
+  const abort = () => reject(signal.reason || abortReason("cancelled"));
+  if (signal.aborted) {
+    promise.catch(() => {});
+    abort();
+    return;
+  }
+  signal.addEventListener("abort", abort, { once: true });
+  promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort));
+});
+
+const waitQuietly = (delay, signal) => new Promise((resolve, reject) => {
+  let timer;
+  const finish = () => {
+    window.clearTimeout(timer);
+    signal.removeEventListener("abort", abort);
+  };
+  const abort = () => { finish(); reject(signal.reason || abortReason("cancelled")); };
+  if (signal.aborted) { abort(); return; }
+  signal.addEventListener("abort", abort, { once: true });
+  timer = window.setTimeout(() => { finish(); resolve(); }, delay);
+});
+
+const clearAsyncJourneyWork = () => {
+  selectionController?.abort(abortReason("cancelled"));
+  generationController?.abort(abortReason("cancelled"));
+  activePoemControllers.forEach((controller) => controller.abort(abortReason("cancelled")));
+  activePoemControllers.clear();
+  window.clearTimeout(generationDeadlineTimer);
+  window.clearTimeout(journeyBeforeWordsTimer);
+  window.clearTimeout(settleTimer);
+  window.clearTimeout(statusMessageTimer);
+  effectTimers.forEach((timer) => window.clearTimeout(timer));
+  effectTimers.clear();
+  isSelectingFiles = false;
+  journeyStatus?.classList.remove("is-visible");
+  if (journeyStatus) journeyStatus.replaceChildren();
+};
+
+const clearSampleJourneyBridge = () => {
+  window.clearTimeout(sampleJourneyBridgeTimer);
+  sampleJourneyBridgeTimer = undefined;
+  sampleJourneyBridge?.classList.remove("is-visible");
+  if (sampleJourneyBridge) sampleJourneyBridge.inert = true;
+};
+
+const isSampleBridgeEligible = () => !journeyState.ready &&
+  journeyState.acceptedFiles.length === 0 && journeyState.currentIndex === 6 &&
+  ["idle", "hidden"].includes(journeyState.gate);
+
+const updateSampleJourneyBridge = () => {
+  if (!isSampleBridgeEligible()) { clearSampleJourneyBridge(); return; }
+  if (sampleJourneyBridgeTimer || sampleJourneyBridge?.classList.contains("is-visible")) return;
+  sampleJourneyBridgeTimer = window.setTimeout(() => {
+    sampleJourneyBridgeTimer = undefined;
+    if (!isSampleBridgeEligible()) return;
+    sampleJourneyBridge.inert = false;
+    sampleJourneyBridge.classList.add("is-visible");
+  }, SAMPLE_BRIDGE_DELAY_MS);
+};
+
+const showInvalidPhotoStatus = () => {
+  window.clearTimeout(statusMessageTimer);
+  journeyStatus.replaceChildren();
+  const ja = document.createElement("span");
+  ja.lang = "ja";
+  ja.textContent = "別の一枚を。";
+  const en = document.createElement("small");
+  en.textContent = "Choose another moment.";
+  journeyStatus.append(ja, en);
+  journeyStatus.classList.add("is-visible");
+  statusMessageTimer = window.setTimeout(() => {
+    journeyStatus.classList.remove("is-visible");
+    journeyStatus.replaceChildren();
+  }, 3000);
+};
 
 const setScreenHeight = () => {
   document.documentElement.style.setProperty(
@@ -163,9 +282,9 @@ const normalizeJapanesePoemLines = (lines) => {
 };
 
 const normalizeJourneyPoem = (poem) => {
-  const japanese = normalizeJapanesePoemLines(Array.isArray(poem?.japanese)
+  const japanese = Array.isArray(poem?.japanese)
     ? poem.japanese.map(normalizePoemText).flatMap(splitPoemLines)
-    : splitPoemLines(poem?.japanese_poem));
+    : splitPoemLines(poem?.japanese_poem);
   const english = Array.isArray(poem?.english)
     ? poem.english.map(normalizePoemText).flatMap(splitPoemLines)
     : splitPoemLines(poem?.english_poem);
@@ -175,7 +294,8 @@ const normalizeJourneyPoem = (poem) => {
       ? poem.mood_tags
       : [];
 
-  if (japanese.length === 0 || english.length === 0) {
+  if (japanese.length !== 3 || english.length === 0 ||
+      japanese.some((line) => [...line].length > 8 || /\p{Script=Latin}/u.test(line) || /^[\p{P}\p{S}\s]+$/u.test(line))) {
     return null;
   }
 
@@ -183,6 +303,8 @@ const normalizeJourneyPoem = (poem) => {
     .map((tag) => String(tag).trim().toLowerCase())
     .filter(Boolean)
     .slice(0, 5);
+
+  if (normalizedMoodTags.length === 0) return null;
 
   return {
     japanese: japanese.slice(0, 3),
@@ -193,7 +315,7 @@ const normalizeJourneyPoem = (poem) => {
 };
 
 const createFallbackJourneyPoems = () =>
-  Array.from({ length: journeyLimit }, () => ({ ...fallbackPoem }));
+  Array.from({ length: journeyLimit }, (_, index) => getFallbackPoem(index));
 
 const createBeforeWordsJourneyPoems = () =>
   Array.from({ length: journeyLimit }, () => ({
@@ -364,6 +486,7 @@ const resetJourneyStar = () => {
   journeyState.takeOneShown = false;
   journeyState.isTakingOne = false;
   journeyState.takeOneCompleted = false;
+  journeyState.keptIndex = null;
   journeyState.returnJourneyShown = false;
   journeyState.isReturningJourney = false;
 };
@@ -666,18 +789,22 @@ const showTakeOneAction = () => {
     }
 
     journeyState.isTakingOne = true;
+    const requestId = journeyState.requestId;
+    const keptIndex = journeyState.currentIndex;
     action.disabled = true;
     action.classList.add("is-taking-one");
 
     const completed = await exportCurrentTanzaku();
+    if (requestId !== journeyState.requestId) return;
 
     journeyState.isTakingOne = false;
 
     if (completed) {
       journeyState.takeOneCompleted = true;
+      journeyState.keptIndex = keptIndex;
       action.classList.remove("is-taking-one");
       action.classList.add("is-taken");
-      window.setTimeout(() => action.remove(), 520);
+      later(() => action.remove(), 520);
       scheduleReturnJourneyAction();
       return;
     }
@@ -702,7 +829,7 @@ const scheduleTakeOneAction = () => {
   takeOneTimer = window.setTimeout(() => {
     takeOneTimer = undefined;
     showTakeOneAction();
-  }, 1400);
+  }, reducedMotion() ? 200 : 1400);
 };
 
 const restoreInitialTanzakuContent = () => {
@@ -741,6 +868,9 @@ const restoreInitialTanzakuContent = () => {
 
 const resetJourneyToStart = () => {
   journeyState.requestId += 1;
+  clearAsyncJourneyWork();
+  clearSampleJourneyBridge();
+  preparedFiles = [];
   clearJourneyStarTimer();
   clearJourneyWaterTimer();
   clearTakeOneTimer();
@@ -767,6 +897,7 @@ const resetJourneyToStart = () => {
   journeyState.takeOneShown = false;
   journeyState.isTakingOne = false;
   journeyState.takeOneCompleted = false;
+  journeyState.keptIndex = null;
   journeyState.returnJourneyShown = false;
   journeyState.isReturningJourney = false;
 
@@ -779,6 +910,8 @@ const resetJourneyToStart = () => {
   );
   journeyGate?.classList.remove("is-before-words", "is-preparing-path");
   journeyGate?.setAttribute("aria-hidden", "true");
+  if (journeyGate) journeyGate.inert = true;
+  if (lane) lane.inert = false;
 
   restoreInitialTanzakuContent();
   setGateIntro();
@@ -796,6 +929,21 @@ const resetJourneyToStart = () => {
   markTanzakuSeen(tanzakuItems[0]);
 };
 
+const cancelJourneyGate = () => {
+  if (!["selecting", "preparing"].includes(journeyState.gate)) return;
+  const opener = gateOpener;
+  const fromBridge = opener === sampleJourneyBridge;
+  resetJourneyToStart();
+  if (fromBridge) {
+    lane.scrollTo({ top: tanzakuItems[6].offsetTop - tanzakuItems[0].offsetTop, behavior: "instant" });
+    setCurrentTanzaku(tanzakuItems[6]);
+    clearSampleJourneyBridge();
+    sampleJourneyBridge.inert = false;
+    sampleJourneyBridge.classList.add("is-visible");
+  }
+  (opener || journeyEntry)?.focus({ preventScroll: true });
+};
+
 const showReturnWaterMemory = (onFinish) => {
   removeWaterMemories();
 
@@ -803,13 +951,17 @@ const showReturnWaterMemory = (onFinish) => {
   memory.className = "water-memory";
   memory.setAttribute("aria-hidden", "true");
 
+  let finished = false;
+  const requestId = journeyState.requestId;
   const finishWaterMemory = () => {
+    if (finished || requestId !== journeyState.requestId) return;
+    finished = true;
     window.clearTimeout(removeTimer);
     memory.remove();
     onFinish?.();
   };
 
-  const removeTimer = window.setTimeout(finishWaterMemory, 4400);
+  const removeTimer = later(finishWaterMemory, reducedMotion() ? 350 : 4400);
 
   memory.addEventListener("animationend", finishWaterMemory, {
     once: true,
@@ -827,15 +979,15 @@ const returnJourneyToWater = () => {
   clearReturnJourneyTimer();
   document.body.classList.add("is-returning-journey");
 
-  const currentTanzaku = getCurrentTanzaku();
+  const currentTanzaku = tanzakuItems[journeyState.keptIndex] || getCurrentTanzaku();
   tanzakuItems.forEach((item) => {
     item.classList.toggle("is-returning-away", item !== currentTanzaku);
   });
 
-  window.setTimeout(removeReturnJourneyActions, 900);
-  window.setTimeout(() => {
+  later(removeReturnJourneyActions, reducedMotion() ? 150 : 900);
+  later(() => {
     showReturnWaterMemory(resetJourneyToStart);
-  }, 1700);
+  }, reducedMotion() ? 220 : 1700);
 };
 
 const showReturnJourneyAction = () => {
@@ -887,7 +1039,7 @@ const scheduleReturnJourneyAction = () => {
 };
 
 const showWaterMemory = () => {
-  if (journeyState.waterShown) {
+  if (!journeyState.ready || journeyState.waterShown) {
     return;
   }
 
@@ -897,13 +1049,17 @@ const showWaterMemory = () => {
   memory.className = "water-memory";
   memory.setAttribute("aria-hidden", "true");
 
+  let finished = false;
+  const requestId = journeyState.requestId;
   const finishWaterMemory = () => {
+    if (finished || requestId !== journeyState.requestId) return;
+    finished = true;
     window.clearTimeout(removeTimer);
     memory.remove();
     scheduleTakeOneAction();
   };
 
-  const removeTimer = window.setTimeout(finishWaterMemory, 4400);
+  const removeTimer = later(finishWaterMemory, reducedMotion() ? 350 : 4400);
 
   memory.addEventListener("animationend", finishWaterMemory, {
     once: true,
@@ -913,7 +1069,7 @@ const showWaterMemory = () => {
 };
 
 const showJourneyStar = () => {
-  if (journeyState.starShown) {
+  if (!journeyState.ready || journeyState.starShown) {
     return;
   }
 
@@ -923,7 +1079,7 @@ const showJourneyStar = () => {
   star.className = "journey-star";
   star.setAttribute("aria-hidden", "true");
 
-  const removeTimer = window.setTimeout(() => star.remove(), 2400);
+  const removeTimer = later(() => star.remove(), reducedMotion() ? 350 : 2400);
 
   star.addEventListener("animationend", () => {
     window.clearTimeout(removeTimer);
@@ -938,7 +1094,7 @@ const showJourneyStar = () => {
   journeyWaterTimer = window.setTimeout(() => {
     journeyWaterTimer = undefined;
     showWaterMemory();
-  }, 1450);
+  }, reducedMotion() ? 300 : 1450);
 };
 
 const updateJourneyStarState = () => {
@@ -998,6 +1154,7 @@ const setCurrentTanzaku = (item) => {
   });
 
   updateJourneyStarState();
+  updateSampleJourneyBridge();
 };
 
 const markTanzakuSeen = (item) => {
@@ -1075,19 +1232,33 @@ const getCompressedImageName = (file) => {
   return `${baseName || "compressed"}.jpg`;
 };
 
-const loadImageForCompression = (file) =>
+const loadImageForCompression = (file, signal) =>
   new Promise((resolve, reject) => {
     const imageUrl = URL.createObjectURL(file);
     const image = new Image();
-
-    image.onload = () => {
+    const cleanup = () => {
+      window.clearTimeout(timer);
+      signal.removeEventListener("abort", abort);
+      image.onload = null;
+      image.onerror = null;
       URL.revokeObjectURL(imageUrl);
+    };
+    const abort = () => {
+      cleanup();
+      image.src = "";
+      reject(signal.reason || abortReason("invalid_image"));
+    };
+    const timer = window.setTimeout(abort, 12000);
+    if (signal.aborted) { abort(); return; }
+    signal.addEventListener("abort", abort, { once: true });
+    image.onload = () => {
+      cleanup();
       resolve(image);
     };
 
     image.onerror = () => {
-      URL.revokeObjectURL(imageUrl);
-      reject(new Error("Image could not be decoded"));
+      cleanup();
+      reject(abortReason("invalid_image"));
     };
 
     image.decoding = "async";
@@ -1110,9 +1281,14 @@ const canvasToJpegBlob = (canvas, quality) =>
     );
   });
 
-const createCompressedImageFile = async (file, index) => {
+const createCompressedImageFile = async (file, image, signal) => {
+  const canvas = document.createElement("canvas");
+  const compressionController = new AbortController();
+  const cancel = () => compressionController.abort(signal.reason);
+  signal.addEventListener("abort", cancel, { once: true });
+  const timeout = window.setTimeout(() => compressionController.abort(abortReason("compression_timeout")), 12000);
   try {
-    const image = await loadImageForCompression(file);
+    if (signal.aborted) throw signal.reason;
     const maxSide = 1280;
     const originalWidth = image.naturalWidth || image.width;
     const originalHeight = image.naturalHeight || image.height;
@@ -1124,7 +1300,6 @@ const createCompressedImageFile = async (file, index) => {
     const scale = Math.min(1, maxSide / Math.max(originalWidth, originalHeight));
     const width = Math.max(1, Math.round(originalWidth * scale));
     const height = Math.max(1, Math.round(originalHeight * scale));
-    const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d", {
       alpha: false,
     });
@@ -1135,17 +1310,18 @@ const createCompressedImageFile = async (file, index) => {
 
     canvas.width = width;
     canvas.height = height;
+    context.imageSmoothingQuality = "high";
     context.drawImage(image, 0, 0, width, height);
 
     const targetBytes = 1024 * 1024;
-    let blob = await canvasToJpegBlob(canvas, 0.72);
+    let blob = await withAbort(canvasToJpegBlob(canvas, 0.72), compressionController.signal);
 
     if (blob.size > targetBytes) {
-      blob = await canvasToJpegBlob(canvas, 0.66);
+      blob = await withAbort(canvasToJpegBlob(canvas, 0.66), compressionController.signal);
     }
 
     if (blob.size > targetBytes) {
-      blob = await canvasToJpegBlob(canvas, 0.6);
+      blob = await withAbort(canvasToJpegBlob(canvas, 0.6), compressionController.signal);
     }
 
     const compressedFile =
@@ -1157,54 +1333,105 @@ const createCompressedImageFile = async (file, index) => {
         : blob;
 
     return compressedFile;
-  } catch (error) {
-    console.error("image compression failed:", {
-      index: index + 1,
-      error: error?.message || "unknown",
-    });
-    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+    signal.removeEventListener("abort", cancel);
+    image.src = "";
+    canvas.width = canvas.height = 0;
   }
 };
 
-const requestPoemForCard = async (file, index, requestId) => {
-  const compressedFile = await createCompressedImageFile(file, index);
+const requestPoemForCard = async (file, signal) => {
   const formData = new FormData();
-  formData.append("image", compressedFile);
+  formData.append("image", file, "moment.jpg");
 
-  const response = await fetch("/api/poem", {
+  const response = await withAbort(fetch("/api/poem", {
     method: "POST",
     body: formData,
-  });
+    signal,
+  }), signal);
 
   if (!response.ok) {
-    const errorJson = await readPoemErrorJson(response);
+    const errorJson = await withAbort(readPoemErrorJson(response), signal);
     const error = new Error(`Poem request failed with ${response.status}`);
     error.status = response.status;
-    error.detail = errorJson;
+    error.diagnosticStatus = Number(errorJson?.status) || response.status;
+    error.stage = typeof errorJson?.stage === "string" ? errorJson.stage : "openai_request";
     throw error;
   }
 
-  const responseJson = await response.json();
+  let responseJson;
+  try {
+    responseJson = await withAbort(response.json(), signal);
+  } catch (error) {
+    if (signal.aborted) throw signal.reason;
+    throw abortReason("schema_validation");
+  }
   const poem = normalizeJourneyPoem(responseJson);
 
   if (!poem) {
-    throw new Error("Poem response was invalid");
+    throw abortReason("schema_validation");
   }
 
   return poem;
 };
 
-const waitForBeforeWordsPaint = () =>
-  new Promise((resolve) => {
-    if (typeof window.requestAnimationFrame === "function") {
-      window.requestAnimationFrame(() => {
-        window.setTimeout(resolve, 420);
-      });
-      return;
-    }
+const canRetryPoem = (error) => {
+  if (["invalid_image", "schema_validation", "openai_response_parse", "missing_api_key", "cancelled", "deadline"].includes(error?.stage)) return false;
+  if (error?.status >= 400 && error.status < 500 && error.status !== 429) return false;
+  const status = error?.diagnosticStatus || error?.status;
+  if (status) return status === 429 || (status >= 500 && status <= 599);
+  return error instanceof TypeError || error?.stage === "request_timeout";
+};
 
-    window.setTimeout(resolve, 520);
+const generateCardPoem = async (item, signal, deadlineAt) => {
+  if (!item.optimizedFile) return getFallbackPoem(item.originalIndex);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (signal.aborted || Date.now() >= deadlineAt) throw abortReason("deadline");
+    const controller = new AbortController();
+    const abort = () => controller.abort(signal.reason);
+    signal.addEventListener("abort", abort, { once: true });
+    activePoemControllers.add(controller);
+    const timer = window.setTimeout(() => controller.abort(abortReason("request_timeout")), POEM_REQUEST_TIMEOUT_MS);
+    let failure;
+    try {
+      return await requestPoemForCard(item.optimizedFile, controller.signal);
+    } catch (error) {
+      failure = error;
+    } finally {
+      window.clearTimeout(timer);
+      signal.removeEventListener("abort", abort);
+      activePoemControllers.delete(controller);
+    }
+    if (signal.aborted) throw signal.reason;
+    if (attempt === 0 && canRetryPoem(failure) && deadlineAt - Date.now() > POEM_RETRY_DELAY_MS + 3000) {
+      await waitQuietly(POEM_RETRY_DELAY_MS, signal);
+      continue;
+    }
+    console.error("Poem unavailable", { index: item.originalIndex, status: failure?.diagnosticStatus || failure?.status || null });
+    return getFallbackPoem(item.originalIndex);
+  }
+};
+
+const waitForBeforeWordsPaint = (signal) => new Promise((resolve, reject) => {
+  let frame;
+  let timer;
+  const cleanup = () => {
+    window.clearTimeout(timer);
+    window.cancelAnimationFrame(frame);
+    signal.removeEventListener("abort", abort);
+  };
+  const finish = () => { cleanup(); resolve(); };
+  const abort = () => { cleanup(); reject(signal.reason); };
+  if (signal.aborted) { abort(); return; }
+  signal.addEventListener("abort", abort, { once: true });
+  // Resolve even when rAF is suspended, and cancel both paths on Back.
+  timer = window.setTimeout(finish, reducedMotion() ? 100 : 520);
+  frame = window.requestAnimationFrame(() => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(finish, reducedMotion() ? 50 : 420);
   });
+});
 
 const setGateIntro = () => {
   journeyGate?.classList.remove("is-before-words", "is-preparing-path");
@@ -1221,6 +1448,10 @@ const showJourneyGate = () => {
   }
 
   journeyState.gate = "selecting";
+  clearSampleJourneyBridge();
+  lane.inert = true;
+  journeyGate.inert = false;
+  journeyPick.disabled = false;
   document.body.classList.add("is-choosing-journey");
   journeyGate?.setAttribute("aria-hidden", "false");
   setJourneyCount(journeyState.acceptedFiles.length);
@@ -1228,6 +1459,8 @@ const showJourneyGate = () => {
 
 const showPreparingGate = () => {
   journeyState.gate = "preparing";
+  journeyPick.disabled = true;
+  journeyBack?.focus({ preventScroll: true });
   journeyGate?.classList.add("is-before-words", "is-preparing-path");
   renderGateText(beforePath);
   document.body.classList.remove("is-choosing-journey");
@@ -1237,6 +1470,8 @@ const showPreparingGate = () => {
 };
 
 const hideJourneyGate = () => {
+  journeyGate.inert = true;
+  lane.inert = false;
   document.body.classList.remove(
     "is-choosing-journey",
     "is-entering-lane",
@@ -1282,7 +1517,7 @@ const renderJourneyItem = (index, journeyItem) => {
   const image = item?.querySelector(".memory-photo img");
   const japanesePoem = item?.querySelector(".jp-poem");
   const englishPoem = item?.querySelector(".en-poem");
-  const nextPoem = journeyItem?.poem || fallbackPoem;
+  const nextPoem = journeyItem?.poem || getFallbackPoem(index);
 
   if (!item || !image || !japanesePoem || !englishPoem) {
     return;
@@ -1324,7 +1559,7 @@ const updateJourneyCardPoem = (index, poem) => {
   const item = tanzakuItems[index];
   const japanesePoem = item?.querySelector(".jp-poem");
   const englishPoem = item?.querySelector(".en-poem");
-  const nextPoem = poem || fallbackPoem;
+  const nextPoem = poem || getFallbackPoem(index);
 
   if (!item || !japanesePoem || !englishPoem) {
     return;
@@ -1358,12 +1593,14 @@ const createJourneyCards = (
   clearJourneyPhotoUrls();
   resetJourneyStar();
   resetTanzakuReveal();
+  const preparedItems = journeyState.items;
   journeyState.items = [];
   journeyState.arranged = displayOrder.length === journeyLimit;
   journeyState.flowOrder = [...displayOrder];
 
   displayOrder.forEach((sourceIndex, index) => {
-    const file = journeyFiles[sourceIndex];
+    const prepared = preparedItems[sourceIndex];
+    const file = prepared?.displayFile || journeyFiles[sourceIndex];
 
     if (!file) {
       return;
@@ -1371,8 +1608,9 @@ const createJourneyCards = (
 
     const photoUrl = URL.createObjectURL(file);
     selectedJourneyPhotoUrls.push(photoUrl);
-    const poem = journeyPoems[sourceIndex] || fallbackPoem;
+    const poem = journeyPoems[sourceIndex] || getFallbackPoem(sourceIndex);
     const journeyItem = {
+      ...prepared,
       file,
       originalIndex: sourceIndex,
       photoUrl,
@@ -1394,67 +1632,37 @@ const createJourneyCards = (
   }
 
   activateFirstCard();
+  lane.focus({ preventScroll: true });
 };
 
-const startJourneyPoemRequest = (requestId) => {
-  const poemRequests = journeyState.acceptedFiles
-    .slice(0, journeyLimit)
-    .map((file, index) => {
-      const delayMs = index * 1500;
-
-      return new Promise((resolve) => {
-        const timer = window.setTimeout(() => {
-          if (requestId !== journeyState.requestId) {
-            resolve(null);
-            return;
-          }
-
-          requestPoemForCard(file, index, requestId)
-            .then((poem) => {
-              if (requestId !== journeyState.requestId) {
-                resolve(null);
-                return;
-              }
-
-              journeyState.poems[index] = poem;
-              if (journeyState.items[index]) {
-                journeyState.items[index].poem = poem;
-                journeyState.items[index].settled = true;
-              }
-              resolve(poem);
-            })
-            .catch((error) => {
-              console.error("poem request failed:", index + 1, {
-                status: error?.status || error?.detail?.status || null,
-                error: error?.detail || error?.message || "unknown",
-              });
-
-              if (requestId !== journeyState.requestId) {
-                resolve(null);
-                return;
-              }
-
-              journeyState.poems[index] = { ...fallbackPoem };
-              if (journeyState.items[index]) {
-                journeyState.items[index].poem = journeyState.poems[index];
-                journeyState.items[index].settled = true;
-              }
-              resolve(journeyState.poems[index]);
-            });
-        }, delayMs);
-
-        poemRequestTimers.push(timer);
-      });
-    });
-
-  return Promise.all(poemRequests).then(() => {
-    if (requestId !== journeyState.requestId) {
-      return null;
-    }
-
+const startJourneyPoemRequest = async (requestId, controller) => {
+  const { signal } = controller;
+  const deadlineAt = Date.now() + JOURNEY_GENERATION_DEADLINE_MS;
+  generationDeadlineTimer = window.setTimeout(() => controller.abort(abortReason("deadline")), JOURNEY_GENERATION_DEADLINE_MS);
+  const items = journeyState.items.slice();
+  try {
+    await Promise.all(items.map(async (item, index) => {
+      let poem = getFallbackPoem(index);
+      try {
+        await waitQuietly(index * 1500, signal);
+        poem = await generateCardPoem(item, signal, deadlineAt);
+      } catch {
+        // Cancellation and the deadline settle each card independently.
+      }
+      if (requestId !== journeyState.requestId) return;
+      item.poem = poem;
+      item.settled = true;
+      journeyState.poems[index] = poem;
+    }));
+    if (requestId !== journeyState.requestId) return null;
     arrangeJourneyIfReady();
     return journeyState.poems;
-  });
+  } finally {
+    if (generationController === controller) {
+      window.clearTimeout(generationDeadlineTimer);
+      generationController = undefined;
+    }
+  }
 };
 
 const prepareJourneyItems = () => {
@@ -1463,6 +1671,8 @@ const prepareJourneyItems = () => {
     .slice(0, journeyLimit)
     .map((file, index) => ({
       file,
+      displayFile: preparedFiles[index]?.displayFile || file,
+      optimizedFile: preparedFiles[index]?.optimizedFile || null,
       originalIndex: index,
       poem: journeyState.poems[index],
       settled: false,
@@ -1483,19 +1693,26 @@ const enterJourneyWhenReady = () => {
   const requestId = journeyState.requestId + 1;
   journeyState.requestId = requestId;
   journeyState.gate = "preparing";
+  const controller = new AbortController();
+  generationController = controller;
 
   window.clearTimeout(journeyBeforeWordsTimer);
 
   journeyBeforeWordsTimer = window.setTimeout(async () => {
+    if (requestId !== journeyState.requestId) return;
     showPreparingGate();
-    await waitForBeforeWordsPaint();
+    try {
+      await waitForBeforeWordsPaint(controller.signal);
+    } catch {
+      return;
+    }
 
     if (requestId !== journeyState.requestId) {
       return;
     }
 
     prepareJourneyItems();
-    await startJourneyPoemRequest(requestId);
+    await startJourneyPoemRequest(requestId, controller);
 
     if (requestId !== journeyState.requestId) {
       return;
@@ -1505,28 +1722,53 @@ const enterJourneyWhenReady = () => {
   }, 260);
 };
 
-const acceptSelectedFiles = (selectedFiles) => {
-  const selectedFileList = [...selectedFiles];
-  const remainingSlots = journeyLimit - journeyState.acceptedFiles.length;
-  const nextAcceptedFiles = selectedFileList
-    .filter(isQuietImageFile)
-    .slice(0, Math.max(remainingSlots, 0));
-
-  journeyState.acceptedFiles = [
-    ...journeyState.acceptedFiles,
-    ...nextAcceptedFiles,
-  ].slice(0, journeyLimit);
-
-  setJourneyCount(journeyState.acceptedFiles.length);
+const acceptSelectedFiles = async (selectedFiles, signal, requestId) => {
+  for (const file of selectedFiles) {
+    if (signal.aborted || requestId !== journeyState.requestId || journeyState.acceptedFiles.length === journeyLimit) break;
+    let image;
+    try {
+      if (!isQuietImageFile(file)) throw abortReason("invalid_image");
+      image = await loadImageForCompression(file, signal);
+      if (!image.naturalWidth || !image.naturalHeight) throw abortReason("invalid_image");
+    } catch {
+      if (signal.aborted) break;
+      showInvalidPhotoStatus();
+      continue;
+    }
+    let optimizedFile = null;
+    try {
+      optimizedFile = await createCompressedImageFile(file, image, signal);
+    } catch {
+      // A decoded original remains displayable if JPEG encoding alone failed.
+    }
+    if (signal.aborted || requestId !== journeyState.requestId) break;
+    const displayFile = optimizedFile || file;
+    preparedFiles.push({ displayFile, optimizedFile });
+    journeyState.acceptedFiles.push(displayFile);
+    setJourneyCount(journeyState.acceptedFiles.length);
+  }
 };
 
-const handleJourneySelection = (files) => {
-  if (journeyState.ready || journeyState.gate === "preparing") {
+const handleJourneySelection = async (files) => {
+  if (journeyState.ready || journeyState.gate === "preparing" || isSelectingFiles) {
     return;
   }
 
   showJourneyGate();
-  acceptSelectedFiles(files);
+  isSelectingFiles = true;
+  journeyPick.disabled = true;
+  const controller = new AbortController();
+  selectionController = controller;
+  const requestId = journeyState.requestId;
+  try {
+    await acceptSelectedFiles([...files], controller.signal, requestId);
+  } finally {
+    if (selectionController === controller) {
+      isSelectingFiles = false;
+      journeyPick.disabled = false;
+    }
+  }
+  if (controller.signal.aborted || requestId !== journeyState.requestId) return;
 
   if (journeyState.acceptedFiles.length < journeyLimit) {
     return;
@@ -1573,15 +1815,44 @@ if (lane) {
   lane.addEventListener("scroll", queueSettleUpdate, { passive: true });
 }
 
-journeyEntry?.addEventListener("click", showJourneyGate);
+const openJourneyPicker = (opener) => {
+  if (journeyState.ready || journeyState.gate === "preparing" || isSelectingFiles) return;
+  if (["idle", "hidden"].includes(journeyState.gate)) gateOpener = opener;
+  showJourneyGate();
+  journeyPick.focus({ preventScroll: true });
+  quietMomentInput?.click();
+};
 
-journeyGate?.addEventListener("click", () => {
+journeyEntry?.addEventListener("click", () => openJourneyPicker(journeyEntry));
+sampleJourneyBridge?.addEventListener("click", () => openJourneyPicker(sampleJourneyBridge));
+journeyBack?.addEventListener("click", cancelJourneyGate);
+journeyPick?.addEventListener("click", () => openJourneyPicker(gateOpener));
+
+journeyGate?.addEventListener("click", (event) => {
+  if (event.target.closest("button, a, input")) return;
   if (!journeyState.ready && journeyState.gate === "selecting") {
-    quietMomentInput?.click();
+    openJourneyPicker(gateOpener);
   }
 });
 
-quietMomentInput?.addEventListener("click", showJourneyGate);
+document.addEventListener("keydown", (event) => {
+  if (!["selecting", "preparing"].includes(journeyState.gate)) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    cancelJourneyGate();
+  }
+  if (event.key === "Tab") {
+    const controls = [...journeyGate.querySelectorAll("button:not(:disabled), a[href]")];
+    const first = controls[0];
+    const last = controls.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  }
+});
+
+quietMomentInput?.addEventListener("cancel", () => {
+  if (journeyState.gate === "selecting") journeyPick.focus({ preventScroll: true });
+});
 
 quietMomentInput?.addEventListener("change", () => {
   handleJourneySelection(quietMomentInput.files || []);
@@ -1589,6 +1860,9 @@ quietMomentInput?.addEventListener("change", () => {
 });
 
 window.addEventListener("beforeunload", () => {
+  journeyState.requestId += 1;
+  clearAsyncJourneyWork();
+  clearSampleJourneyBridge();
   window.clearTimeout(settleTimer);
   window.clearTimeout(journeyBeforeWordsTimer);
   clearJourneyStarTimer();

@@ -1,232 +1,52 @@
-# Japan Memory Lane AI Connection Spec v1.0
+# Japan Memory Lane AI Connection Spec
 
-This document defines the future AI connection for Japan Memory Lane.
+Current implementation: v2.26 Quiet Reliability Core.
+Originally drafted for v1.0; this document now describes the implemented connection. README is the development entry point; SITE_SPEC.md covers the complete journey and AI_GENERATION_RULES.md covers writing.
 
-The AI connection is not implemented yet. This spec exists so the later implementation can stay quiet, small, and consistent with the tanzaku experience.
+## Architecture
 
-## Purpose
+The static frontend lives in public/. Cloudflare Pages Functions handles POST /api/poem and calls the OpenAI Responses API with an image data URL and strict JSON Schema. OPENAI_API_KEY is read only on the server; OPENAI_MODEL is optional. store: false remains enabled. The frontend never contacts OpenAI directly. /api/journey is not used by the current frontend.
 
-After a user selects a photo, the site should ask a server-side API to generate:
+## Seven-card flow
 
-- a Japanese poem
-- a small English poem
-- mood tags for internal use
+1. Select seven browser-decodable photos in the gate. Invalid files do not count; valid partial selections stay.
+2. Decode sequentially and optimize once: JPEG, maximum long side 1280px, quality 0.72, then 0.66 / 0.60 only above 1MB. Each decode/encode has a 12000ms bound. Reuse the optimized File for sending, display, and export. An encoding-only failure may display the decoded original with a local fallback poem.
+3. Show 巡りの前 / before the path. Back and Escape remain usable; the lane is inert.
+4. Start seven isolated /api/poem requests 1500ms apart.
+5. Hold completed poems internally. Each attempt times out after 16000ms. Retry a transient failure at most once after 800ms, only if at least 3000ms remains after that delay.
+6. At the 30000ms generation deadline abort unfinished work, retaining completed cards and filling only unfinished cards with fallback.
+7. Once every card settles, compute heat-to-calm order, create cards in that order, and enter the lane. Never change content/order after entry.
 
-The AI should not feel like a feature. It should feel like the selected photo slowly finds words.
+## Request and response
 
-## Core Principles
+POST /api/poem receives multipart/form-data with image (sent as moment.jpg).
+The server accepts JPEG, PNG, WebP up to 8MB. The current browser sends optimized JPEG.
 
-- Do not make AI the main experience.
-- Do not show UI text such as `Generate`, `AI`, or `Prompt`.
-- Keep the flow: photo, pause, Japanese poem, English poem.
-- Do not show a loading state.
-- Do not show a spinner.
-- Do not show generation progress.
-- If generation fails, fall back quietly.
-- Never expose the API key in browser code.
+Response fields:
+- japanese_poem: exactly three nonempty lines, separated by two newline characters.
+- english_poem: a short supporting interpretation.
+- mood_tags: one to five lowercase atmosphere tags, used internally only.
 
-## Recommended Architecture
+After balancing, the server rejects poems with fewer/more than three lines, punctuation-only lines, Latin characters, or lines over eight code points. English must not be empty. Tags must be valid nonempty strings. No additional provider call is made to repair validation errors. Existing writing direction, Japanese-only rule, and avoidance of casual stone imagery in English are preserved.
 
-### Frontend
+## Cancellation and failures
 
-Static files:
+A lifecycle AbortController cancels staged delays, retries, requests, and response-body reads. Each attempt has its own AbortController and timeout. requestId prevents late results from reaching a new journey. Reset, gate Back/Escape, and beforeunload release requests and timers; object URLs are revoked when the displayed journey ends.
 
-- `index.html`
-- `style.css`
-- `main.js`
+Retry only network errors, request timeouts, HTTP 429/5xx, or diagnostic status 429/5xx. Do not retry invalid_image, schema_validation, openai_response_parse, missing_api_key, other 4xx, cancellation, stale work, or the journey deadline. No technical error text, progress, or retry controls appear in the UI.
 
-The frontend should:
+Fallback uses seven deterministic local poems in public/main.js, selected by original photo index. Each is three Japanese lines with one or two English lines and neutral moodTags: ["fallback"]. No one-line ellipsis fallback remains. One failed card does not stop the other six; even seven failures produce a complete journey.
 
-- show the selected photo immediately
-- hide the first tanzaku poem while waiting
-- send the image to the API in the background
-- apply the returned poem using the existing delayed reveal timing
-- fall back to predefined poem candidates if the API fails
+Safe error JSON contains error, stage, status, message. Provider raw bodies, photos, base64 payloads, filenames, and poem text are not logged or returned in diagnostics.
 
-### API
+## Photo handling
 
-Use Cloudflare Pages Functions or Cloudflare Workers.
+Selected photos are sent to OpenAI to produce words. Japan Memory Lane does not keep an account, gallery, or image history. No new database, analytics, cookies, or tracking are introduced.
 
-Reasons:
+OpenAI states that API data is not used for training by default. Abuse-monitoring data is normally retained for up to 30 days, with legal and safety exceptions, including review of certain flagged image inputs. store: false does not establish Zero Data Retention.
+Official policy: https://developers.openai.com/api/docs/guides/your-data
+Public explanation: /colophon/#photo-handling
 
-- keeps the site mostly static
-- keeps the API key server-side
-- works naturally with Cloudflare Pages
-- avoids exposing provider credentials to the browser
+## Verification
 
-## Endpoint
-
-```text
-POST /api/poem
-```
-
-### Request
-
-Use `multipart/form-data`.
-
-Fields:
-
-- `image`: one image file
-
-Allowed input formats:
-
-- `jpg`
-- `jpeg`
-- `png`
-- `webp`
-
-The server should reject unsupported file types quietly with an error response. The frontend should not show that error to the user.
-
-### Response
-
-Return JSON only.
-
-```json
-{
-  "japanese_poem": "窓に\n雨の跡が\n残っていた",
-  "english_poem": "The rain had stopped,\nbut the window still remembered.",
-  "mood_tags": ["rain", "quiet", "memory"]
-}
-```
-
-## JSON Schema
-
-Use this schema for structured output validation.
-
-```json
-{
-  "name": "japan_memory_lane_poem",
-  "schema": {
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {
-      "japanese_poem": {
-        "type": "string"
-      },
-      "english_poem": {
-        "type": "string"
-      },
-      "mood_tags": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "minItems": 1,
-        "maxItems": 5
-      }
-    },
-    "required": ["japanese_poem", "english_poem", "mood_tags"]
-  },
-  "strict": true
-}
-```
-
-## Frontend Flow
-
-1. The user selects a photo from `Upload a quiet moment in Japan.`
-2. The selected photo appears immediately in the first tanzaku.
-3. The Japanese and English poems are hidden.
-4. The frontend sends the image to `/api/poem` in the background.
-5. If the API returns a valid result, update the poem text.
-6. If the API fails, choose one predefined local poem candidate.
-7. After a short pause, reveal the Japanese poem.
-8. A little later, reveal the English poem.
-
-The mood tags are not displayed in the UI for v1.0.
-
-## Timing
-
-Keep the existing v0.8 feeling:
-
-- photo appears immediately
-- Japanese poem appears after about 1.2 to 1.5 seconds
-- English poem appears about 0.4 to 0.6 seconds after the Japanese
-- opacity only
-- no movement animation
-
-If the API takes longer than the first pause, the frontend should keep the poem hidden until either:
-
-- a valid API result arrives
-- the request times out and fallback is used
-
-The pause should feel intentional, not like loading.
-
-## Failure Behavior
-
-If AI generation fails:
-
-- do not show an error message
-- do not show technical text
-- do not show a retry button
-- do not change the visual layout
-- use the existing predefined poem candidates
-- continue the same delayed reveal flow
-
-Failure should feel like the quiet mock still works.
-
-## API Prompt
-
-Use this baseline prompt for the server-side request.
-
-```text
-You are writing for Japan Memory Lane.
-
-This is not a travel guide.
-This is not an AI caption generator.
-This is a quiet memory of Japan.
-
-Look at the uploaded photo.
-Find only a small trace of atmosphere:
-light, rain, silence, sound, distance, season, time, or stillness.
-
-Write a short Japanese poem first.
-The Japanese must be natural, quiet, and suitable for vertical writing.
-Do not explain the photo.
-Do not describe everything.
-Do not say emotions directly.
-Do not use dramatic or overly poetic words.
-Leave space.
-
-Then write a small English poem as a gentle interpretation.
-The English should support the Japanese, not replace it.
-
-Return only JSON.
-```
-
-Detailed writing rules live in `AI_GENERATION_RULES.md`.
-
-## Security Rules
-
-- Never write the AI provider API key in `main.js`.
-- Store the API key in Cloudflare environment variables.
-- The browser should only call `/api/poem`.
-- The API should validate file type and size.
-- The API should return only the JSON needed by the UI.
-- The frontend should not expose raw provider errors.
-
-## UI Restrictions
-
-Do not add:
-
-- AI labels
-- Generate buttons
-- prompt boxes
-- loading text
-- spinners
-- progress bars
-- error banners
-- social sharing
-- sound
-- star effects
-
-## Completion Criteria
-
-The future implementation is acceptable when:
-
-- selecting a photo immediately makes it the first tanzaku photo
-- the Japanese poem appears after a quiet pause
-- the English poem appears slightly later and remains secondary
-- the output does not feel like an AI result
-- fallback behavior is invisible
-- no API key is exposed to the browser
-
+Use local mocked requests for success, partial failure, offline, timeout, deadline, cancellation, and a second journey. Do not submit private photos for testing. The frozen export canvas, PC download/mobile sharing, star/water, and 15-second return delay remain the SITE_SPEC contract.

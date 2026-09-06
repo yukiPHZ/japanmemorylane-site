@@ -30,10 +30,11 @@
   <link rel="manifest" href="/assets/favicon/site.webmanifest">
   <meta name="theme-color" content="#0f0f10">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 <body>
-  <main class="lane" aria-label="Japan Memory Lane quiet moments">
+  <main class="lane" tabindex="-1" aria-label="Japan Memory Lane quiet moments">
     <section class="tanzaku is-first" data-index="1" aria-label="Rain window">
       <header class="site-head">
         <p class="site-name">Japan Memory Lane</p>
@@ -62,19 +63,11 @@
       </div>
 
       <footer class="site-foot">
-        <label class="upload-link journey-entry" id="journeyEntry">
+        <button type="button" class="upload-link journey-entry" id="journeyEntry">
           <span class="entry-ja" lang="ja">七つ、<br />ことばの前へ</span>
           <span class="entry-en">Seven moments,<br />before words.</span>
           <span class="entry-count" id="journeyCount">0 / 7</span>
-          <input
-            class="quiet-file-input"
-            id="quietMomentInput"
-            type="file"
-            accept="image/*"
-            multiple
-            aria-label="Choose seven quiet moments in Japan"
-          />
-        </label>
+        </button>
         <nav class="site-about-nav" aria-label="About Japan Memory Lane">
           <a href="/about/" lang="ja">想い</a>
           <span aria-hidden="true">/</span>
@@ -224,14 +217,29 @@
     </section>
   </main>
 
-  <div class="journey-gate" id="journeyGate" aria-hidden="true">
+  <input class="quiet-file-input" id="quietMomentInput" type="file"
+    accept="image/*" multiple tabindex="-1" aria-label="Choose seven quiet moments in Japan">
+
+  <button type="button" class="sample-journey-bridge journey-entry" id="sampleJourneyBridge" inert>
+    <span class="entry-ja" lang="ja">あなたの七つ、<br>ことばの前へ</span>
+    <span class="entry-en">Your seven moments,<br>before words.</span>
+  </button>
+
+  <div class="journey-gate" id="journeyGate" role="dialog" aria-modal="true" aria-labelledby="journeyGateJapanese" aria-hidden="true" inert>
     <div class="journey-gate-inner">
-      <p class="journey-gate-ja" id="journeyGateJapanese" lang="ja">
+      <button type="button" id="journeyPick" class="journey-gate-pick">
+      <span class="journey-gate-ja" id="journeyGateJapanese" lang="ja">
         七つ、<br />ことばの前へ
-      </p>
-      <p class="journey-gate-en" id="journeyGateEnglish">
+      </span>
+      <span class="journey-gate-en" id="journeyGateEnglish">
         Seven moments,<br />before words.
-      </p>
+      </span>
+      </button>
+    </div>
+    <p class="journey-status" id="journeyStatus" role="status" aria-live="polite" aria-atomic="true"></p>
+    <div class="journey-gate-controls">
+      <button type="button" id="journeyBack" lang="ja">戻る</button>
+      <a href="/colophon/#photo-handling" target="_blank" rel="noopener"><span lang="ja">写真の扱い</span><small>Photo handling</small></a>
     </div>
     <p class="journey-gate-count"><span id="journeyGateCount">0</span> / 7</p>
   </div>

@@ -15,6 +15,25 @@ Japan Memory Lane is a small static site for moving through seven quiet moments.
 
 AI is used only to place a small amount of language beside the photo. The browser never receives the OpenAI API key.
 
+## Quiet Reliability (v2.26)
+
+- The seventh sample offers a quiet bridge to your own seven after 1800ms. Samples never trigger the star, water, or take-one action.
+- The photo gate has Back / Escape in both selection and preparation. Valid partial selections remain available until cancelled; unreadable photos do not count.
+- Photos are decoded one at a time, then optimized once (1280px maximum, JPEG 0.72 / 0.66 / 0.60). The same optimized file supplies the API, card, and take-one canvas. If JPEG encoding alone fails, the decoded original can supply display while that card uses a local poem.
+- Seven `/api/poem` calls start 1500ms apart. Each attempt has a 16000ms timeout; transient failures get at most one retry after 800ms, only with at least 3000ms left after the delay. A 30000ms journey deadline releases all unfinished cards into distinct three-line local poems.
+- Completed poems and heat-to-calm order are fixed before the lane appears. Cancelled and old responses cannot update a new journey.
+- Reduced motion, keyboard focus, safe-area spacing, and resource cleanup cover selection, generation, take-one, and return. The completed export canvas composition is unchanged.
+
+### Photo handling
+
+Selected photos are sent to OpenAI through Pages Functions with `store: false`. This site does not retain an account, public gallery, or image history. OpenAI states that API data is not used for training by default; abuse-monitoring retention is normally up to 30 days, with legal and safety exceptions. `store: false` is not a claim of Zero Data Retention. See [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data) and `/colophon/#photo-handling`.
+
+Five existing sample image files serve seven cards. Cards six and seven still reuse samples. Two user-owned photos are needed for seven unique samples: `residential-evening.jpg` and `winter-morning.jpg`. No replacement images or placeholder files have been added.
+
+### Reliability checks
+
+`node --test tests/reliability.test.mjs` checks server validation, static controls, and the frozen canvas/prompt. With Playwright available, run `node tests/reliability.browser.mjs` against `npm run dev -- --port 8789`; `PLAYWRIGHT_MODULE` may point to an existing Playwright entry point. Browser checks mock poem requests and never call OpenAI. Test captures stay under ignored `.wrangler/`.
+
 ## Do Not Commit
 
 - `.env`
