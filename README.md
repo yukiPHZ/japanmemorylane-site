@@ -4,6 +4,12 @@ Quiet Japanese memories, written as vertical poems.
 
 Japan Memory Lane is a small static site for moving through seven quiet moments. It is not a travel guide, not a social feed, and not an AI tool interface. Photos and short vertical poems are kept sparse so the memory has room to breathe.
 
+## Role and creator entity
+
+Japan Memory Lane is an independent work born from the idea of not holding every memory: keep one and return the rest. It remains separate from NICE SKILL and PEAKHEADZ promotion. The visual journey, poems, photographs, controls, and ending must not gain profile or circulation CTAs.
+
+The creator Person Entity is `https://yukihikokikuta.com/#person`. Connect it quietly through `WebSite.creator`, About, or Colophon; do not create a separate local Person entity or add the creator name to the first view.
+
 ## Current Scope
 
 - Static frontend: `public/index.html`, `public/style.css`, `public/main.js`
